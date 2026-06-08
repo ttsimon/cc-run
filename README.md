@@ -27,11 +27,6 @@ scoop install ccr
 brew install ttsimon/tap/ccr
 ```
 
-**5. winget（Windows，上架后）**
-```
-winget install ttsimon.ccr
-```
-
 **从源码自行构建：**
 ```
 go build -o ccr ./cmd/ccr     # Windows 下产物为 ccr.exe
@@ -86,7 +81,7 @@ go build -o ccr ./cmd/ccr     # Windows 下产物为 ccr.exe
 
 纯 Go 实现（`modernc.org/sqlite` 免 cgo），单文件二进制，无运行时依赖。
 
-发布走 [GoReleaser](https://goreleaser.com)：打一个 `v*` tag 推上去，GitHub Actions 会自动构建全平台、发 Release、并更新 Scoop / Homebrew / winget。完整流程与一次性设置见 [RELEASING.md](RELEASING.md)。
+发布走 [GoReleaser](https://goreleaser.com)：打一个 `v*` tag 推上去，GitHub Actions 会自动构建全平台、发 Release、并更新 Scoop / Homebrew。完整流程与一次性设置见 [RELEASING.md](RELEASING.md)。
 
 本地多平台试构建：
 ```

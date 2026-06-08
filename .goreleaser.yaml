@@ -85,23 +85,5 @@ homebrew_casks:
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/ccr"]
           end
 
-# --- Windows: winget（向 microsoft/winget-pkgs 提 PR；需 fork + 审核） ---
-winget:
-  - name: ccr
-    publisher: ttsimon
-    license: MIT
-    homepage: "https://github.com/ttsimon/cc-run"
-    short_description: "用选定 provider 的环境变量启动 claude，可同时多开、各用不同后端"
-    package_identifier: ttsimon.ccr
-    repository:
-      owner: ttsimon
-      name: winget-pkgs # 你 fork 的 microsoft/winget-pkgs
-      branch: "ccr-{{ .Version }}"
-      token: "{{ .Env.GORELEASER_TOKEN }}"
-      pull_request:
-        enabled: true
-        draft: false
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
+# winget 暂未启用。如需上架（向 microsoft/winget-pkgs 提 PR，需 fork + 审核），
+# 参见 https://goreleaser.com/customization/winget/ 并补一个 winget: 段。

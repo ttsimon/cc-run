@@ -22,22 +22,14 @@ gh repo create ttsimon/homebrew-tap --public --description "Homebrew tap for ccr
 ```
 > scoop-bucket / homebrew-tap 建成空仓库即可，GoReleaser 发布时会自动往里写文件。
 
-### 2. winget（可选，上架门槛较高）
+> winget 暂未启用。日后想上架（manifest 进微软官方 `microsoft/winget-pkgs`，需 fork + PR 审核，未签名二进制有 SmartScreen 警告），按 <https://goreleaser.com/customization/winget/> 在 `.goreleaser.yaml` 补一个 `winget:` 段即可。
 
-winget 的 manifest 要进微软官方仓库 `microsoft/winget-pkgs`，流程：
-1. 在 GitHub 上 **fork** `microsoft/winget-pkgs` 到 `ttsimon/winget-pkgs`。
-2. 发布时 GoReleaser 会往你的 fork 推一个分支，并向 `microsoft/winget-pkgs` 提 PR。
-3. 微软的机器人/审核员校验通过后合并，`winget install ttsimon.ccr` 才可用（首次可能要几天）。
-4. 未签名的二进制安装时用户会看到 SmartScreen 警告——要消除需代码签名证书（可后续再做）。
+### 2. 配置 PAT secret
 
-不想现在弄 winget，就把 `.goreleaser.yaml` 里的 `winget:` 整段删掉或注释掉，其余渠道不受影响。
-
-### 3. 配置 PAT secret
-
-本仓库的 Release 用 Actions 内置的 `GITHUB_TOKEN` 就够；但**推送到 scoop-bucket / homebrew-tap / winget fork 是跨仓库写**，内置 token 没权限，需要一个 Personal Access Token：
+本仓库的 Release 用 Actions 内置的 `GITHUB_TOKEN` 就够；但**推送到 scoop-bucket / homebrew-tap 是跨仓库写**，内置 token 没权限，需要一个 Personal Access Token：
 
 1. GitHub → Settings → Developer settings → **Personal access tokens**
-   - Fine-grained：对 `scoop-bucket`、`homebrew-tap`、`winget-pkgs` 三个仓库授予 **Contents: Read and write** + **Pull requests: Read and write**；
+   - Fine-grained：对 `scoop-bucket`、`homebrew-tap` 两个仓库授予 **Contents: Read and write**；
    - 或 Classic：勾选 `repo` 即可。
 2. 主仓库 → Settings → Secrets and variables → Actions → **New repository secret**
    - Name：`GORELEASER_TOKEN`
@@ -61,7 +53,7 @@ git push origin v0.1.0
 推送后：
 - GitHub Actions 的 `release` 工作流自动运行 GoReleaser；
 - 产出全平台压缩包 + `checksums.txt`，创建 GitHub Release；
-- 更新 `scoop-bucket`、`homebrew-tap`；若启用了 winget，则向 `microsoft/winget-pkgs` 提 PR。
+- 更新 `scoop-bucket`、`homebrew-tap`。
 
 ### 本地预演（不发布）
 
