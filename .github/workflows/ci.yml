@@ -50,7 +50,7 @@ jobs:
         with:
           fetch-depth: 0 # gitleaks 需要完整历史
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-go@v6
