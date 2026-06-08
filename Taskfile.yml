@@ -1,0 +1,63 @@
+# go-task 任务入口，三平台一致。安装 task：https://taskfile.dev
+# 列出全部： task   或   task --list
+version: "3"
+
+tasks:
+  default:
+    desc: 列出可用任务
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: 构建 ccr（产物在仓库根，已 gitignore）
+    cmds:
+      - go build ./cmd/ccr
+
+  test:
+    desc: 跑全部测试
+    cmds:
+      - go test ./...
+
+  fmt:
+    desc: 格式化代码
+    cmds:
+      - gofmt -w .
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: golangci-lint（需先装 golangci-lint v2）
+    cmds:
+      - golangci-lint run
+
+  vuln:
+    desc: 官方漏洞扫描
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  secrets:
+    desc: 全仓库密钥扫描（需先装 gitleaks）
+    cmds:
+      - gitleaks detect --no-banner
+
+  hooks:
+    desc: 安装 git 钩子（克隆后跑一次）
+    cmds:
+      - lefthook install
+
+  snapshot:
+    desc: 本地试打包（不发布），产物在 dist/
+    cmds:
+      - goreleaser release --snapshot --clean
+
+  check:
+    desc: 提交前全套：格式化 + vet + lint + 测试
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint
+      - task: test

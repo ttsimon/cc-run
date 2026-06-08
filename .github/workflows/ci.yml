@@ -1,10 +1,13 @@
 name: ci
 
-# push 到 master 或任何 PR 时跑测试，与发布（release.yml）分开。
+# push 到 master 或任何 PR 时跑测试/检查，与发布（release.yml）分开。
 on:
   push:
     branches: [master]
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -27,18 +30,31 @@ jobs:
         run: go build ./cmd/ccr
 
   lint:
-    name: gofmt
+    name: golangci-lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-      - name: gofmt
-        run: |
-          out=$(gofmt -l .)
-          if [ -n "$out" ]; then
-            echo "以下文件需要 gofmt："
-            echo "$out"
-            exit 1
-          fi
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+      - name: Lint
+        run: $(go env GOPATH)/bin/golangci-lint run
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks 需要完整历史
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

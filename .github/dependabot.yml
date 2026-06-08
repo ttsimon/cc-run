@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Go 模块依赖
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build # 走 Conventional Commits，且不进 release notes
+
+  # GitHub Actions 版本
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci

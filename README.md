@@ -82,6 +82,10 @@ go build -o ccr ./cmd/ccr     # Windows 下产物为 ccr.exe
 { "db": "C:\\path\\cc-switch.db", "profilesDir": "D:\\my-profiles" }
 ```
 
+## 开发
+
+开发环境、`task` 命令、提交规范、git 钩子见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ## 构建与发布
 
 纯 Go 实现（`modernc.org/sqlite` 免 cgo），单文件二进制，无运行时依赖。

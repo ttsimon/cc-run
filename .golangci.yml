@@ -1,0 +1,26 @@
+version: "2"
+
+# 默认已启用 errcheck/govet/ineffassign/staticcheck/unused，这里再补几个低噪声的。
+linters:
+  enable:
+    - misspell
+    - unconvert
+  settings:
+    errcheck:
+      # 这些函数的错误返回值无需处理（输出到 stdout/缓冲、只读句柄的 defer Close）。
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*os.File).WriteString
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/ttsimon/cc-run

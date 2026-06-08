@@ -1,0 +1,28 @@
+# lefthook：本地 git 钩子，提交/推送前自动把关。
+# 克隆后启用一次： task hooks   （等价于 lefthook install）
+pre-commit:
+  parallel: true
+  commands:
+    # Go 代码自动格式化并重新 stage。
+    fmt:
+      glob: "*.go"
+      run: gofmt -w {staged_files}
+      stage_fixed: true
+    # 静态检查。
+    lint:
+      glob: "*.go"
+      run: golangci-lint run
+    # 密钥扫描：拦住误提交的 token/key。
+    gitleaks:
+      run: gitleaks protect --staged --redact --no-banner
+
+pre-push:
+  commands:
+    test:
+      run: go test ./...
+
+commit-msg:
+  commands:
+    # 校验 Conventional Commits（纯 Go，无额外运行时）。
+    conventional:
+      run: go run ./tools/commitlint {1}
