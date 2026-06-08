@@ -1,0 +1,3 @@
+# 让 Git 自动规范换行符，消除 CRLF 警告
+* text=auto eol=lf
+*.go text eol=lf
