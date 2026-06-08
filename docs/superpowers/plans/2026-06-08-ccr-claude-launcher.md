@@ -123,7 +123,7 @@ import "testing"
 func TestRedactToken(t *testing.T) {
 	cases := map[string]string{
 		"sk-FAKE000000000000000000000000000": "sk-FAKE…",
-		"ark-FAKE0000":                       "ark-882…",
+		"ark-FAKE0000":                       "ark-FAK…",
 		"短":                                  "…",
 		"":                                   "",
 	}
