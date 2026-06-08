@@ -1,7 +1,11 @@
 package main
 
-import "fmt"
+import (
+	"os"
+
+	"ccr/internal/cli"
+)
 
 func main() {
-	fmt.Println("ccr: ok")
+	os.Exit(cli.Execute(os.Args[1:]))
 }
