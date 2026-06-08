@@ -1,6 +1,6 @@
 package source
 
-import "ccr/internal/profile"
+import "github.com/ttsimon/cc-run/internal/profile"
 
 // ProfileSource 是一个 Profile 来源。
 type ProfileSource interface {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 )
 
 // settingsConfig 对应 cc-switch settings_config 与自定义文件的 JSON 形状。

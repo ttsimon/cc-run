@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 )
 
 // Registry 持有合并后的 Profile 列表。

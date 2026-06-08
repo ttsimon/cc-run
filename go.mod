@@ -1,4 +1,4 @@
-module ccr
+module github.com/ttsimon/cc-run
 
 go 1.26.4
 

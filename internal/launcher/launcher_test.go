@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 )
 
 func TestComposeEnv_profile覆盖且去重(t *testing.T) {

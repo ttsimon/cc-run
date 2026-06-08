@@ -4,7 +4,7 @@ package tui
 import (
 	"fmt"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 
 	"github.com/charmbracelet/huh"
 )

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 
 	_ "modernc.org/sqlite"
 )

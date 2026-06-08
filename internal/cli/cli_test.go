@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"ccr/internal/profile"
-	"ccr/internal/registry"
+	"github.com/ttsimon/cc-run/internal/profile"
+	"github.com/ttsimon/cc-run/internal/registry"
 )
 
 func reg() *registry.Registry {

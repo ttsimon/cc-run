@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 )
 
 // ComposeEnv 把 profileEnv 叠加到 base 上（profile 覆盖同名键），去重后返回。

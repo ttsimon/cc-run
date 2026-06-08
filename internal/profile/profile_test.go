@@ -7,7 +7,7 @@ func TestRedactToken(t *testing.T) {
 		"sk-REDACTED-ROTATED": "sk-8035…",
 		"ark-FAKE0000":                        "ark-882…",
 		"短":                                   "…",
-		"":                                     "",
+		"":                                    "",
 	}
 	for in, want := range cases {
 		if got := RedactToken(in); got != want {

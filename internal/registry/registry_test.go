@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 )
 
 func sample() []profile.Profile {

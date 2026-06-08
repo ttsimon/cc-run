@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 )
 
 // CustomDir 从一个目录读取 *.json，每个文件一个 Profile。

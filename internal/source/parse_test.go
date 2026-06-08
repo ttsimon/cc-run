@@ -3,7 +3,7 @@ package source
 import (
 	"testing"
 
-	"ccr/internal/profile"
+	"github.com/ttsimon/cc-run/internal/profile"
 )
 
 func TestParseSettingsConfig_火山(t *testing.T) {

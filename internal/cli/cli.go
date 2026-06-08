@@ -11,12 +11,19 @@ import (
 	"runtime"
 	"sort"
 
-	"ccr/internal/config"
-	"ccr/internal/launcher"
-	"ccr/internal/profile"
-	"ccr/internal/registry"
-	"ccr/internal/source"
-	"ccr/internal/tui"
+	"github.com/ttsimon/cc-run/internal/config"
+	"github.com/ttsimon/cc-run/internal/launcher"
+	"github.com/ttsimon/cc-run/internal/profile"
+	"github.com/ttsimon/cc-run/internal/registry"
+	"github.com/ttsimon/cc-run/internal/source"
+	"github.com/ttsimon/cc-run/internal/tui"
+)
+
+// 版本信息，由 main 注入（GoReleaser 通过 ldflags 设置）。
+var (
+	Version = "dev"
+	Commit  = "none"
+	Date    = "unknown"
 )
 
 // Execute 是 CLI 入口，返回进程退出码。
@@ -28,6 +35,9 @@ func Execute(args []string) int {
 		switch args[0] {
 		case "-h", "--help":
 			printUsage(os.Stdout)
+			return 0
+		case "-v", "--version", "version":
+			fmt.Printf("ccr %s (commit %s, built %s)\n", Version, Commit, Date)
 			return 0
 		case "ls":
 			r, code := buildRegistry(cfg)
