@@ -1,5 +1,10 @@
 # ccr
 
+[![CI](https://github.com/ttsimon/cc-run/actions/workflows/ci.yml/badge.svg)](https://github.com/ttsimon/cc-run/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ttsimon/cc-run)](https://github.com/ttsimon/cc-run/releases/latest)
+[![Go Reference](https://pkg.go.dev/badge/github.com/ttsimon/cc-run.svg)](https://pkg.go.dev/github.com/ttsimon/cc-run)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 用选定 provider 的环境变量启动 `claude`，从而可同时多开、各用不同后端，互不干扰，且不改全局配置。
 
 `cc-switch` 切换的是**全局**当前 provider（同一时刻只有一个）。`ccr` 则给**当前这个终端**注入某个 provider 的环境变量再拉起 `claude`——你想多开就开多个终端 tab，每个跑一次 `ccr <名字>`，各用各的后端。

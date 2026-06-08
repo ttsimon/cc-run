@@ -44,17 +44,37 @@ checksum:
 
 changelog:
   sort: asc
+  groups:
+    - title: 新功能
+      regexp: "^feat"
+      order: 0
+    - title: 修复
+      regexp: "^fix"
+      order: 1
+    - title: 其他改动
+      order: 999
   filters:
     exclude:
       - "^docs:"
       - "^test:"
       - "^chore:"
       - "^ci:"
+      - "^security:"
+      - "^refactor:"
 
 release:
   github:
     owner: ttsimon
     name: cc-run
+  footer: |
+    ## 安装
+
+    - **下载二进制**：下方选对应系统的压缩包，解压把 `ccr`（Windows 为 `ccr.exe`）放进 PATH
+    - **go install**：`go install github.com/ttsimon/cc-run/cmd/ccr@latest`
+    - **Scoop**：`scoop bucket add ttsimon https://github.com/ttsimon/scoop-bucket && scoop install ccr`
+    - **Homebrew**：`brew install ttsimon/tap/ccr`
+
+    用法见 [README](https://github.com/ttsimon/cc-run#readme)。
 
 # --- Windows: Scoop（自有 bucket，即时生效，无审核） ---
 scoops:
