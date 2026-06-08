@@ -1,0 +1,13 @@
+title = "ccr gitleaks 配置"
+
+# 保留 gitleaks 全部内置规则。
+[extend]
+useDefault = true
+
+# 仅放行明确的占位假 token（测试/文档用），真实随机密钥仍会被拦。
+[allowlist]
+description = "测试/文档中的占位假 token，非真实密钥"
+regexes = [
+  '''(?i)(sk|ark)-fake[\w-]*''',
+  '''sk-1234567890''',
+]
