@@ -59,6 +59,8 @@ changelog:
       - "^test:"
       - "^chore:"
       - "^ci:"
+      - "^build:"
+      - "^style:"
       - "^security:"
       - "^refactor:"
 

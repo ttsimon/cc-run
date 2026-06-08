@@ -50,7 +50,7 @@ gh repo create ttsimon/homebrew-tap --public --description "Homebrew tap for ccr
 | `feat:` | 新功能 | ✅「新功能」组 |
 | `fix:` | 修复 | ✅「修复」组 |
 | 其他（无明确前缀） | | ✅「其他改动」组 |
-| `docs:` `test:` `chore:` `ci:` `refactor:` `security:` | 杂项 | ❌ 不进 release notes（见 `.goreleaser.yaml` 的 `changelog.filters`） |
+| `docs:` `test:` `chore:` `ci:` `build:` `style:` `refactor:` `security:` | 杂项 | ❌ 不进 release notes（见 `.goreleaser.yaml` 的 `changelog.filters`） |
 
 所以**写好 commit message = 自动得到漂亮的发布说明**，无需手动维护任何变更文件。
 
