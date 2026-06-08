@@ -39,6 +39,23 @@ gh repo create ttsimon/homebrew-tap --public --description "Homebrew tap for ccr
 
 ## 二、每次发布
 
+### 变更日志的标准
+
+本项目**不手写 CHANGELOG.md**，发布说明（release notes）由 GoReleaser 在打 tag 时**从 commit 自动生成**——Releases 页面就是变更日志。
+
+前提：commit message 用 [Conventional Commits](https://www.conventionalcommits.org/) 前缀，GoReleaser 会据此分组：
+
+| 前缀 | 含义 | 出现在 release notes |
+|---|---|---|
+| `feat:` | 新功能 | ✅「新功能」组 |
+| `fix:` | 修复 | ✅「修复」组 |
+| 其他（无明确前缀） | | ✅「其他改动」组 |
+| `docs:` `test:` `chore:` `ci:` `refactor:` `security:` | 杂项 | ❌ 不进 release notes（见 `.goreleaser.yaml` 的 `changelog.filters`） |
+
+所以**写好 commit message = 自动得到漂亮的发布说明**，无需手动维护任何变更文件。
+
+---
+
 确保 `main` 干净、测试通过：
 ```bash
 go test ./...
