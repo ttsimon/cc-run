@@ -1,0 +1,36 @@
+name: release
+
+# 推送 v* tag 时触发：构建全平台、发 GitHub Release、推送 Scoop/Homebrew/winget manifest。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # 在本仓库创建 Release
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GoReleaser 需要完整历史与 tag
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          # 本仓库 Release 用内置 token 即可。
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 推送到 scoop-bucket / homebrew-tap / winget fork 需要一个有这些仓库写权限的 PAT。
+          GORELEASER_TOKEN: ${{ secrets.GORELEASER_TOKEN }}

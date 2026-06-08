@@ -6,11 +6,37 @@
 
 ## 安装
 
+任选一种：
+
+**1. 预编译二进制（任何系统，无需 Go）**
+到 [Releases](https://github.com/ttsimon/cc-run/releases) 下载对应系统的压缩包，解压后把 `ccr`（Windows 为 `ccr.exe`）放进 PATH。
+
+**2. `go install`（有 Go 环境）**
 ```
-go build -o ccr .        # Windows 下产物为 ccr.exe
+go install github.com/ttsimon/cc-run/cmd/ccr@latest
 ```
 
-把生成的二进制放进 PATH。交叉编译见文末。
+**3. Scoop（Windows）**
+```
+scoop bucket add ttsimon https://github.com/ttsimon/scoop-bucket
+scoop install ccr
+```
+
+**4. Homebrew（macOS / Linux）**
+```
+brew install ttsimon/tap/ccr
+```
+
+**5. winget（Windows，上架后）**
+```
+winget install ttsimon.ccr
+```
+
+**从源码自行构建：**
+```
+go build -o ccr ./cmd/ccr     # Windows 下产物为 ccr.exe
+```
+把生成的二进制放进 PATH。多平台构建见 [RELEASING.md](RELEASING.md)。
 
 ## 用法
 
@@ -56,16 +82,13 @@ go build -o ccr .        # Windows 下产物为 ccr.exe
 { "db": "C:\\path\\cc-switch.db", "profilesDir": "D:\\my-profiles" }
 ```
 
-## 交叉编译
-
-```powershell
-$env:CGO_ENABLED=0
-foreach ($t in @("windows/amd64","darwin/arm64","darwin/amd64","linux/amd64")) {
-  $p=$t.Split("/"); $env:GOOS=$p[0]; $env:GOARCH=$p[1]
-  $ext=if($p[0] -eq "windows"){".exe"}else{""}
-  go build -o "dist/ccr-$($p[0])-$($p[1])$ext" .
-}
-Remove-Item Env:GOOS,Env:GOARCH
-```
+## 构建与发布
 
 纯 Go 实现（`modernc.org/sqlite` 免 cgo），单文件二进制，无运行时依赖。
+
+发布走 [GoReleaser](https://goreleaser.com)：打一个 `v*` tag 推上去，GitHub Actions 会自动构建全平台、发 Release、并更新 Scoop / Homebrew / winget。完整流程与一次性设置见 [RELEASING.md](RELEASING.md)。
+
+本地多平台试构建：
+```
+goreleaser release --snapshot --clean   # 产物在 dist/，不发布
+```

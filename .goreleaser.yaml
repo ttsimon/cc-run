@@ -1,0 +1,107 @@
+# GoReleaser 配置：打 tag 时一次产出全平台二进制 + Release + Scoop/Homebrew/winget manifest。
+# 校验： goreleaser check
+# 本地试跑（不发布）： goreleaser release --snapshot --clean
+version: 2
+
+project_name: ccr
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: ccr
+    main: ./cmd/ccr
+    binary: ccr
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .Date }}
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    # Windows 用 zip（Scoop/winget 友好）。
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+
+release:
+  github:
+    owner: ttsimon
+    name: cc-run
+
+# --- Windows: Scoop（自有 bucket，即时生效，无审核） ---
+scoops:
+  - repository:
+      owner: ttsimon
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.GORELEASER_TOKEN }}"
+    directory: bucket
+    homepage: "https://github.com/ttsimon/cc-run"
+    description: "用选定 provider 的环境变量启动 claude，可同时多开、各用不同后端"
+    license: MIT
+
+# --- macOS / Linux: Homebrew tap（Cask，适用于预编译二进制） ---
+homebrew_casks:
+  - repository:
+      owner: ttsimon
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.GORELEASER_TOKEN }}"
+    homepage: "https://github.com/ttsimon/cc-run"
+    description: "用选定 provider 的环境变量启动 claude，可同时多开、各用不同后端"
+    # 未签名二进制：安装后去掉 macOS 隔离属性，避免 Gatekeeper 拦截。
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/ccr"]
+          end
+
+# --- Windows: winget（向 microsoft/winget-pkgs 提 PR；需 fork + 审核） ---
+winget:
+  - name: ccr
+    publisher: ttsimon
+    license: MIT
+    homepage: "https://github.com/ttsimon/cc-run"
+    short_description: "用选定 provider 的环境变量启动 claude，可同时多开、各用不同后端"
+    package_identifier: ttsimon.ccr
+    repository:
+      owner: ttsimon
+      name: winget-pkgs # 你 fork 的 microsoft/winget-pkgs
+      branch: "ccr-{{ .Version }}"
+      token: "{{ .Env.GORELEASER_TOKEN }}"
+      pull_request:
+        enabled: true
+        draft: false
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
