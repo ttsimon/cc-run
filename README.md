@@ -43,12 +43,47 @@ go build -o ccr ./cmd/ccr     # Windows 下产物为 ccr.exe
 | 命令 | 说明 |
 |---|---|
 | `ccr` | 交互式选择一个配置并启动（方向键 + 输入过滤） |
-| `ccr <名字> [claude 参数]` | 按名字直启，多余参数透传给 `claude` |
+| `ccr <名字\|别名\|前缀> [claude 参数]` | 按名/别名/模糊命中直启，多余参数透传给 `claude` |
+| `ccr -` | 重跑上次用的配置 |
+| `ccr .` | 跑默认配置（先用 `ccr default` 设过） |
 | `ccr ls` | 列出全部配置（带来源标记，token 不显示） |
 | `ccr show <名字> [--reveal]` | 查看配置（默认 token 打码，`--reveal` 显示完整） |
 | `ccr edit <名字>` | 用 `$EDITOR` 编辑/新建自定义配置 |
+| `ccr alias [<别名> <目标>]` | 无参列出别名；带参设置别名 |
+| `ccr unalias <别名>` | 删除别名 |
+| `ccr default [<名字>]` | 无参查看默认；带参设置默认 |
+| `ccr completion <shell>` | 打印补全脚本（bash/zsh/powershell） |
+| `ccr completion install [shell] [--uninstall]` | 一键装/卸补全到当前 shell 配置 |
 
 名字在两个来源中冲突时，用限定名消歧：`ccr cc-switch:DeepSeek` 或 `ccr custom:DeepSeek`。
+
+### 别名 / 默认 / 上次
+
+让常用配置更顺手——这些元数据旁挂在 `~/.ccr/`，不动 cc-switch 库：
+
+```
+ccr alias prod cc-switch:DeepSeek   # 设别名，之后 `ccr prod` 直启
+ccr default my-local                # 设默认，之后 `ccr .` 直启
+ccr -                               # 重跑上次用的配置
+ccr de                             # 模糊命中：唯一则直启，多个则弹选择器
+```
+
+别名/默认存 `~/.ccr/overlay.json`，上次用的存 `~/.ccr/state.json`。
+
+`ccr <参数>` 的解析顺序：精确名/限定名 → 别名 → 模糊子串（唯一直启、多命中弹过滤选择器、零命中报错）。
+
+### Shell 补全
+
+`ccr completion install` 与安装方式无关，往当前 shell 的配置文件幂等写入一段引导（重复跑不重复写）：
+
+```
+ccr completion install              # 自动探测 bash/zsh/powershell
+ccr completion install zsh          # 也可显式指定
+ccr completion install zsh --uninstall   # 干净卸载
+ccr completion bash > /某处          # 或自取脚本手动放置
+```
+
+补全里的配置名是动态的（脚本运行时调 `ccr __complete_names` 取当前列表）。
 
 ## 配置来源
 
