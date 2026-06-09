@@ -13,6 +13,7 @@ import (
 
 	"github.com/ttsimon/cc-run/internal/config"
 	"github.com/ttsimon/cc-run/internal/launcher"
+	"github.com/ttsimon/cc-run/internal/overlay"
 	"github.com/ttsimon/cc-run/internal/profile"
 	"github.com/ttsimon/cc-run/internal/registry"
 	"github.com/ttsimon/cc-run/internal/source"
@@ -49,6 +50,8 @@ func Execute(args []string) int {
 			return runShow(cfg, args[1:])
 		case "edit":
 			return runEdit(cfg, args[1:])
+		case "__complete_names":
+			return cmdCompleteNames(cfg, os.Stdout)
 		}
 	}
 
@@ -206,6 +209,22 @@ func runEdit(cfg config.Config, args []string) int {
 		return 1
 	}
 	fmt.Println("已保存:", path)
+	return 0
+}
+
+// cmdCompleteNames 打印补全用的名字：profile 名 + 别名键，每行一个。
+// 供补全脚本调用；任何缺失都安静处理，始终退出 0。
+func cmdCompleteNames(cfg config.Config, out io.Writer) int {
+	profiles, _ := source.LoadAll(
+		source.NewCCSwitch(cfg.DB),
+		source.NewCustomDir(cfg.ProfilesDir),
+	)
+	for _, p := range profiles {
+		fmt.Fprintln(out, p.Name)
+	}
+	for alias := range overlay.LoadOverlay().Aliases {
+		fmt.Fprintln(out, alias)
+	}
 	return 0
 }
 
