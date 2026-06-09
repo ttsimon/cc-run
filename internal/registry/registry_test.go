@@ -67,3 +67,69 @@ func TestList_返回全部(t *testing.T) {
 		t.Errorf("List 应返回全部 4 个")
 	}
 }
+
+func TestLookup_精确命中(t *testing.T) {
+	r := New(sample())
+	res, err := r.Lookup("火山", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Profile.Name != "火山" || len(res.Candidates) != 0 {
+		t.Errorf("应精确命中且无候选: %+v", res)
+	}
+}
+
+func TestLookup_别名命中(t *testing.T) {
+	r := New(sample())
+	res, err := r.Lookup("vol", map[string]string{"vol": "火山"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Profile.Name != "火山" {
+		t.Errorf("别名应解析到 火山: %+v", res)
+	}
+}
+
+func TestLookup_模糊唯一命中(t *testing.T) {
+	r := New(sample())
+	res, err := r.Lookup("local", nil) // 仅 my-local 含 "local"
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Profile.Name != "my-local" || len(res.Candidates) != 0 {
+		t.Errorf("应模糊唯一命中 my-local: %+v", res)
+	}
+}
+
+func TestLookup_模糊多命中返回候选(t *testing.T) {
+	r := New(sample())
+	res, err := r.Lookup("deep", nil) // 两个 DeepSeek 都含 "deep"
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Candidates) != 2 {
+		t.Errorf("应返回 2 个候选交给 TUI: %+v", res)
+	}
+}
+
+func TestLookup_零命中报错(t *testing.T) {
+	r := New(sample())
+	_, err := r.Lookup("zzz", nil)
+	if err == nil {
+		t.Fatal("零命中应报错")
+	}
+}
+
+func TestLookup_精确优先于模糊(t *testing.T) {
+	r := New([]profile.Profile{
+		{Name: "deep", Source: profile.SourceCustom},
+		{Name: "deepsea", Source: profile.SourceCustom},
+	})
+	res, err := r.Lookup("deep", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Profile.Name != "deep" || len(res.Candidates) != 0 {
+		t.Errorf("精确名应优先于模糊: %+v", res)
+	}
+}
