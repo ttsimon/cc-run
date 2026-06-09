@@ -33,6 +33,20 @@ func TestScript_未知shell报错(t *testing.T) {
 	}
 }
 
+func TestLoadLine_带存在性兜底(t *testing.T) {
+	// 引导行必须先确认 ccr 在 PATH 上才执行；否则 ccr 卸载/换版本/不在 PATH 时，
+	// 开 shell 会报错弄脏启动（用户实测踩到过）。
+	if got := loadLine("bash"); !strings.Contains(got, "command -v ccr") {
+		t.Errorf("bash loadLine 应有存在性兜底: %q", got)
+	}
+	if got := loadLine("zsh"); !strings.Contains(got, "command -v ccr") {
+		t.Errorf("zsh loadLine 应有存在性兜底: %q", got)
+	}
+	if got := loadLine("powershell"); !strings.Contains(got, "Get-Command ccr") {
+		t.Errorf("powershell loadLine 应有存在性兜底: %q", got)
+	}
+}
+
 func withHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()

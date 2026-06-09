@@ -86,12 +86,13 @@ func rcPath(shell string) (string, error) {
 }
 
 // loadLine 返回引导块中间那行（source / Invoke-Expression）。
+// 先做存在性兜底：ccr 不在 PATH 上时静默跳过，避免卸载/换版本后污染 shell 启动。
 func loadLine(shell string) string {
 	switch shell {
 	case "powershell", "pwsh":
-		return "ccr completion powershell | Out-String | Invoke-Expression"
+		return "if (Get-Command ccr -ErrorAction SilentlyContinue) { ccr completion powershell | Out-String | Invoke-Expression }"
 	default:
-		return fmt.Sprintf("source <(ccr completion %s)", shell)
+		return fmt.Sprintf("command -v ccr >/dev/null 2>&1 && source <(ccr completion %s)", shell)
 	}
 }
 
