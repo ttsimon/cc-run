@@ -12,7 +12,7 @@
 |---|---|---|
 | `ttsimon/cc-run` | 主仓库（代码 + Release） | 是 |
 | `ttsimon/scoop-bucket` | Scoop manifest（`scoop install ccr`） | 想要 Scoop 才需要 |
-| `ttsimon/homebrew-tap` | Homebrew formula（`brew install`） | 想要 Homebrew 才需要 |
+| `ttsimon/homebrew-tap` | Homebrew Cask（`brew install`，预编译二进制） | 想要 Homebrew 才需要 |
 
 用 `gh` 创建（已登录 GitHub CLI 的话）：
 ```bash
