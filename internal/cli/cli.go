@@ -420,12 +420,21 @@ func printUsage(out io.Writer) {
 	fmt.Fprint(out, `ccr — 用选定 provider 的环境变量启动 claude
 
 用法:
-  ccr                      交互式选择一个配置并启动
-  ccr <名字> [claude参数]   按名字直启，多余参数透传给 claude
-  ccr ls                   列出所有配置（两来源）
-  ccr show <名字> [--reveal] 查看某配置（默认 token 打码）
-  ccr edit <名字>           用 $EDITOR 编辑/新建自定义配置
+  ccr                          交互式选择一个配置并启动
+  ccr <名字|别名|前缀> [claude参数]  按名/别名/模糊命中启动，多余参数透传给 claude
+  ccr -                        重跑上次用的配置
+  ccr .                        跑默认配置（先 ccr default 设过）
+  ccr ls                       列出所有配置（两来源）
+  ccr show <名字> [--reveal]    查看某配置（默认 token 打码）
+  ccr edit <名字>              用 $EDITOR 编辑/新建自定义配置
+  ccr alias [<别名> <目标>]     列出 / 设置别名
+  ccr unalias <别名>           删除别名
+  ccr default [<名字>]          查看 / 设置默认配置
+  ccr completion <shell>       打印补全脚本（bash/zsh/powershell）
+  ccr completion install [shell] [--uninstall]
+                               一键装/卸补全到当前 shell 配置
 
 配置来源: cc-switch 库 + 自定义目录（~/.ccr/profiles/*.json）
+元数据:   别名/默认存 ~/.ccr/overlay.json，上次用的存 ~/.ccr/state.json
 `)
 }
