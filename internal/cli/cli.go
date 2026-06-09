@@ -64,7 +64,7 @@ func Execute(args []string) int {
 		}
 	}
 
-	// 其余：ccr <name> [claude 参数...] 或 ccr（交互）。
+	// 其余：ccr <name> [claude 参数...]、ccr -（上次）、ccr .（默认）、或 ccr（交互）。
 	r, code := buildRegistry(cfg)
 	if code != 0 {
 		return code
@@ -72,6 +72,7 @@ func Execute(args []string) int {
 
 	var chosen profile.Profile
 	var extra []string
+
 	if len(args) == 0 {
 		p, err := tui.SelectProfile(r.List())
 		if err != nil {
@@ -80,14 +81,46 @@ func Execute(args []string) int {
 		}
 		chosen = p
 	} else {
-		p, err := r.Resolve(args[0])
+		ov := overlay.LoadOverlay()
+		query := args[0]
+		extra = args[1:]
+
+		// 特殊记号翻译。
+		switch query {
+		case "-":
+			last := overlay.LoadState().Last
+			if last == "" {
+				fmt.Fprintln(os.Stderr, "还没有「上次」记录；先用 `ccr <名字>` 跑一次。")
+				return 1
+			}
+			query = last
+		case ".":
+			if ov.Default == "" {
+				fmt.Fprintln(os.Stderr, "还没设默认；用 `ccr default <名字>` 设置。")
+				return 1
+			}
+			query = ov.Default
+		}
+
+		res, err := r.Lookup(query, ov.Aliases)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
-		chosen = p
-		extra = args[1:]
+		if len(res.Candidates) > 0 {
+			p, err := tui.SelectProfile(res.Candidates)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "已取消")
+				return 1
+			}
+			chosen = p
+		} else {
+			chosen = res.Profile
+		}
 	}
+
+	// 记录「上次」（限定名，便于 `ccr -` 重放）。失败不致命。
+	_ = overlay.SaveState(overlay.State{Last: fmt.Sprintf("%s:%s", chosen.Source, chosen.Name)})
 
 	code2, err := launcher.New().Run(chosen, extra)
 	if err != nil {
