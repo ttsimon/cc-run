@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -59,5 +61,43 @@ func TestCmdShow_未知名字非零退出(t *testing.T) {
 	var out bytes.Buffer
 	if code := cmdShow(reg(), "nope", false, &out); code == 0 {
 		t.Error("未知名字应非零退出")
+	}
+}
+
+func TestRunAlias_设置并落盘(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	profDir := filepath.Join(home, ".ccr", "profiles")
+	if err := os.MkdirAll(profDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profDir, "my-local.json"),
+		[]byte(`{"env":{"ANTHROPIC_BASE_URL":"http://x"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CCR_DB", filepath.Join(home, "none.db"))
+	t.Setenv("CCR_PROFILES_DIR", profDir)
+
+	if code := Execute([]string{"alias", "ml", "my-local"}); code != 0 {
+		t.Fatalf("alias 应成功, code=%d", code)
+	}
+	raw, err := os.ReadFile(filepath.Join(home, ".ccr", "overlay.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"ml"`) || !strings.Contains(string(raw), `my-local`) {
+		t.Errorf("overlay 应含别名: %s", raw)
+	}
+}
+
+func TestRunAlias_坏目标报错(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CCR_DB", filepath.Join(home, "none.db"))
+	t.Setenv("CCR_PROFILES_DIR", filepath.Join(home, ".ccr", "profiles"))
+	if code := Execute([]string{"alias", "x", "does-not-exist"}); code == 0 {
+		t.Error("坏目标应非 0 退出")
 	}
 }

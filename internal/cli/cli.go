@@ -53,6 +53,12 @@ func Execute(args []string) int {
 			return runEdit(cfg, args[1:])
 		case "completion":
 			return runCompletion(args[1:], os.Stdout)
+		case "alias":
+			return runAlias(cfg, args[1:], os.Stdout)
+		case "unalias":
+			return runUnalias(args[1:], os.Stdout)
+		case "default":
+			return runDefault(cfg, args[1:], os.Stdout)
 		case "__complete_names":
 			return cmdCompleteNames(cfg, os.Stdout)
 		}
@@ -288,6 +294,91 @@ func runCompletion(args []string, out io.Writer) int {
 		return 1
 	}
 	fmt.Fprint(out, script)
+	return 0
+}
+
+// runAlias: 无参列出；`<别名> <目标>` 设置（校验目标可解析）。
+func runAlias(cfg config.Config, args []string, out io.Writer) int {
+	ov := overlay.LoadOverlay()
+	if len(args) == 0 {
+		keys := make([]string, 0, len(ov.Aliases))
+		for k := range ov.Aliases {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(out, "%-16s -> %s\n", k, ov.Aliases[k])
+		}
+		return 0
+	}
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "用法: ccr alias <别名> <目标profile>")
+		return 1
+	}
+	alias, target := args[0], args[1]
+	r, code := buildRegistry(cfg)
+	if code != 0 {
+		return code
+	}
+	if _, err := r.Resolve(target); err != nil {
+		fmt.Fprintln(os.Stderr, "别名目标无法解析:", err)
+		return 1
+	}
+	ov.Aliases[alias] = target
+	if err := overlay.SaveOverlay(ov); err != nil {
+		fmt.Fprintln(os.Stderr, "保存失败:", err)
+		return 1
+	}
+	fmt.Fprintf(out, "已设别名: %s -> %s\n", alias, target)
+	return 0
+}
+
+// runUnalias: 删一个别名。
+func runUnalias(args []string, out io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "用法: ccr unalias <别名>")
+		return 1
+	}
+	ov := overlay.LoadOverlay()
+	if _, ok := ov.Aliases[args[0]]; !ok {
+		fmt.Fprintf(os.Stderr, "没有别名 %q\n", args[0])
+		return 1
+	}
+	delete(ov.Aliases, args[0])
+	if err := overlay.SaveOverlay(ov); err != nil {
+		fmt.Fprintln(os.Stderr, "保存失败:", err)
+		return 1
+	}
+	fmt.Fprintf(out, "已删别名: %s\n", args[0])
+	return 0
+}
+
+// runDefault: 无参打印当前默认；`<目标>` 设置（校验可解析）。
+func runDefault(cfg config.Config, args []string, out io.Writer) int {
+	ov := overlay.LoadOverlay()
+	if len(args) == 0 {
+		if ov.Default == "" {
+			fmt.Fprintln(out, "（未设默认）用 `ccr default <名字>` 设置，之后 `ccr .` 直启。")
+		} else {
+			fmt.Fprintln(out, ov.Default)
+		}
+		return 0
+	}
+	target := args[0]
+	r, code := buildRegistry(cfg)
+	if code != 0 {
+		return code
+	}
+	if _, err := r.Resolve(target); err != nil {
+		fmt.Fprintln(os.Stderr, "默认目标无法解析:", err)
+		return 1
+	}
+	ov.Default = target
+	if err := overlay.SaveOverlay(ov); err != nil {
+		fmt.Fprintln(os.Stderr, "保存失败:", err)
+		return 1
+	}
+	fmt.Fprintf(out, "已设默认: %s（`ccr .` 直启）\n", target)
 	return 0
 }
 
