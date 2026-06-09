@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"sort"
 
+	"github.com/ttsimon/cc-run/internal/completion"
 	"github.com/ttsimon/cc-run/internal/config"
 	"github.com/ttsimon/cc-run/internal/launcher"
 	"github.com/ttsimon/cc-run/internal/overlay"
@@ -50,6 +51,8 @@ func Execute(args []string) int {
 			return runShow(cfg, args[1:])
 		case "edit":
 			return runEdit(cfg, args[1:])
+		case "completion":
+			return runCompletion(args[1:], os.Stdout)
 		case "__complete_names":
 			return cmdCompleteNames(cfg, os.Stdout)
 		}
@@ -225,6 +228,66 @@ func cmdCompleteNames(cfg config.Config, out io.Writer) int {
 	for alias := range overlay.LoadOverlay().Aliases {
 		fmt.Fprintln(out, alias)
 	}
+	return 0
+}
+
+// runCompletion 处理 `ccr completion ...`。
+func runCompletion(args []string, out io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "用法: ccr completion <bash|zsh|powershell> | ccr completion install [shell] [--uninstall]")
+		return 1
+	}
+
+	if args[0] == "install" {
+		uninstall := false
+		shell := ""
+		for _, a := range args[1:] {
+			if a == "--uninstall" {
+				uninstall = true
+			} else {
+				shell = a
+			}
+		}
+		if shell == "" {
+			shell = completion.DetectShell()
+		}
+		if shell == "" {
+			fmt.Fprintln(os.Stderr, "无法探测当前 shell，请显式指定：ccr completion install <bash|zsh|powershell>")
+			return 1
+		}
+		if uninstall {
+			changed, path, err := completion.Uninstall(shell)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			if changed {
+				fmt.Fprintf(out, "已从 %s 移除补全。重开终端生效。\n", path)
+			} else {
+				fmt.Fprintf(out, "%s 中未发现补全，无需移除。\n", path)
+			}
+			return 0
+		}
+		changed, path, err := completion.Install(shell)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if changed {
+			fmt.Fprintf(out, "已把补全写入 %s。重开终端或 source 它生效。\n", path)
+		} else {
+			fmt.Fprintf(out, "%s 已包含补全，无需重复。\n", path)
+		}
+		return 0
+	}
+
+	// 否则 args[0] 当作 shell，打印脚本。
+	script, err := completion.Script(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Fprint(out, script)
 	return 0
 }
 
