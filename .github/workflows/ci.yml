@@ -1,13 +1,17 @@
 name: ci
 
-# push 到 master 或任何 PR 时跑测试/检查，与发布（release.yml）分开。
+# 只在 PR 上跑测试/检查。master 受保护、PR-only，合并后在 master 重跑等于重复 PR 已验过的代码。
+# 发布在 release.yml（打 tag）单独触发。
 on:
-  push:
-    branches: [master]
   pull_request:
 
 permissions:
   contents: read
+
+concurrency:
+  # 同一 PR 被新 push 顶掉时，取消尚在跑的旧运行，省 CI 额度。
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
