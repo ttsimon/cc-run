@@ -34,8 +34,28 @@ func (r *Registry) List() []profile.Profile {
 
 // Resolve 按 query 找唯一 Profile。query 可为 "name" 或 "source:name"。
 func (r *Registry) Resolve(query string) (profile.Profile, error) {
-	wantSource, name := splitQuery(query)
+	matches := r.exactMatches(query)
+	switch len(matches) {
+	case 1:
+		return matches[0], nil
+	case 0:
+		_, name := splitQuery(query)
+		return profile.Profile{}, r.notFoundErr(name)
+	default:
+		var qualified []string
+		for _, p := range matches {
+			qualified = append(qualified, fmt.Sprintf("%s:%s", p.Source, p.Name))
+		}
+		return profile.Profile{}, fmt.Errorf(
+			"名字 %q 有多个来源，请用限定名指定其一：%s",
+			query, strings.Join(qualified, " 、 "),
+		)
+	}
+}
 
+// exactMatches 返回精确（含 source:name 限定）命中的 Profile 列表（0/1/多）。
+func (r *Registry) exactMatches(query string) []profile.Profile {
+	wantSource, name := splitQuery(query)
 	var matches []profile.Profile
 	for _, p := range r.profiles {
 		if p.Name != name {
@@ -46,22 +66,7 @@ func (r *Registry) Resolve(query string) (profile.Profile, error) {
 		}
 		matches = append(matches, p)
 	}
-
-	switch len(matches) {
-	case 1:
-		return matches[0], nil
-	case 0:
-		return profile.Profile{}, r.notFoundErr(name)
-	default:
-		var qualified []string
-		for _, p := range matches {
-			qualified = append(qualified, fmt.Sprintf("%s:%s", p.Source, p.Name))
-		}
-		return profile.Profile{}, fmt.Errorf(
-			"名字 %q 有多个来源，请用限定名指定其一：%s",
-			name, strings.Join(qualified, " 、 "),
-		)
-	}
+	return matches
 }
 
 // splitQuery 拆出可选的 "source:" 前缀。
