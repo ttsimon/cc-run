@@ -18,6 +18,7 @@ Sources(来源)            Registry(合并)         Launcher(启动)
 ```
 
 - 两个配置来源：cc-switch 库（只读）+ 自定义目录 `~/.ccr/profiles/*.json`，合并为一个列表、标注来源、重名用 `来源:名字` 消歧。
+- **旁挂元数据层** `~/.ccr/overlay.json`（别名 + 默认）+ `~/.ccr/state.json`（上次用的）：cc-switch 库只读，别名/默认/上次写不回去，故另存一份；按名解析时叠加——特殊记号 `-`（上次）/ `.`（默认）、别名、模糊子串命中（唯一直启、多命中弹过滤选择器）。
 - 纯逻辑（解析/合并/env 组装/参数）全部单元测试；拉起子进程用 Go helper-process 模式集成测试；TUI/editor 手动验证。
 
 ## 代码布局
@@ -27,9 +28,11 @@ cmd/ccr/            入口（go install 装出的命令名 = ccr）
 internal/profile/   Profile 类型 + token 打码
 internal/source/    parse + ccswitch(SQLite) + customdir(JSON)
 internal/config/    路径解析 env > ~/.ccr/config.json > 默认
-internal/registry/  合并与按名解析
+internal/overlay/   旁挂元数据：overlay.json(别名/默认) + state.json(上次用的)
+internal/registry/  合并 + 按名解析（精确 / 别名 / 模糊命中）
 internal/launcher/  ComposeEnv / ClaudeArgs / Run
-internal/cli/       参数分发 ls/show/edit/<name>/交互
+internal/completion/ 各 shell 补全脚本(bash/zsh/powershell) + 一键装卸(幂等)
+internal/cli/       参数分发 ls/show/edit/alias/unalias/default/completion/-/./<name>/交互
 internal/tui/       huh fuzzy 选择器
 tools/commitlint/   commit-msg 校验（被 lefthook 调用）
 docs/superpowers/   设计 spec 与实现计划

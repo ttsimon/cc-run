@@ -11,8 +11,10 @@ import (
 	"runtime"
 	"sort"
 
+	"github.com/ttsimon/cc-run/internal/completion"
 	"github.com/ttsimon/cc-run/internal/config"
 	"github.com/ttsimon/cc-run/internal/launcher"
+	"github.com/ttsimon/cc-run/internal/overlay"
 	"github.com/ttsimon/cc-run/internal/profile"
 	"github.com/ttsimon/cc-run/internal/registry"
 	"github.com/ttsimon/cc-run/internal/source"
@@ -49,10 +51,20 @@ func Execute(args []string) int {
 			return runShow(cfg, args[1:])
 		case "edit":
 			return runEdit(cfg, args[1:])
+		case "completion":
+			return runCompletion(args[1:], os.Stdout)
+		case "alias":
+			return runAlias(cfg, args[1:], os.Stdout)
+		case "unalias":
+			return runUnalias(args[1:], os.Stdout)
+		case "default":
+			return runDefault(cfg, args[1:], os.Stdout)
+		case "__complete_names":
+			return cmdCompleteNames(cfg, os.Stdout)
 		}
 	}
 
-	// 其余：ccr <name> [claude 参数...] 或 ccr（交互）。
+	// 其余：ccr <name> [claude 参数...]、ccr -（上次）、ccr .（默认）、或 ccr（交互）。
 	r, code := buildRegistry(cfg)
 	if code != 0 {
 		return code
@@ -60,6 +72,7 @@ func Execute(args []string) int {
 
 	var chosen profile.Profile
 	var extra []string
+
 	if len(args) == 0 {
 		p, err := tui.SelectProfile(r.List())
 		if err != nil {
@@ -68,14 +81,46 @@ func Execute(args []string) int {
 		}
 		chosen = p
 	} else {
-		p, err := r.Resolve(args[0])
+		ov := overlay.LoadOverlay()
+		query := args[0]
+		extra = args[1:]
+
+		// 特殊记号翻译。
+		switch query {
+		case "-":
+			last := overlay.LoadState().Last
+			if last == "" {
+				fmt.Fprintln(os.Stderr, "还没有「上次」记录；先用 `ccr <名字>` 跑一次。")
+				return 1
+			}
+			query = last
+		case ".":
+			if ov.Default == "" {
+				fmt.Fprintln(os.Stderr, "还没设默认；用 `ccr default <名字>` 设置。")
+				return 1
+			}
+			query = ov.Default
+		}
+
+		res, err := r.Lookup(query, ov.Aliases)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
-		chosen = p
-		extra = args[1:]
+		if len(res.Candidates) > 0 {
+			p, err := tui.SelectProfile(res.Candidates)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "已取消")
+				return 1
+			}
+			chosen = p
+		} else {
+			chosen = res.Profile
+		}
 	}
+
+	// 记录「上次」（限定名，便于 `ccr -` 重放）。失败不致命。
+	_ = overlay.SaveState(overlay.State{Last: fmt.Sprintf("%s:%s", chosen.Source, chosen.Name)})
 
 	code2, err := launcher.New().Run(chosen, extra)
 	if err != nil {
@@ -209,17 +254,187 @@ func runEdit(cfg config.Config, args []string) int {
 	return 0
 }
 
+// cmdCompleteNames 打印补全用的名字：profile 名 + 别名键，每行一个。
+// 供补全脚本调用；任何缺失都安静处理，始终退出 0。
+func cmdCompleteNames(cfg config.Config, out io.Writer) int {
+	profiles, _ := source.LoadAll(
+		source.NewCCSwitch(cfg.DB),
+		source.NewCustomDir(cfg.ProfilesDir),
+	)
+	for _, p := range profiles {
+		fmt.Fprintln(out, p.Name)
+	}
+	for alias := range overlay.LoadOverlay().Aliases {
+		fmt.Fprintln(out, alias)
+	}
+	return 0
+}
+
+// runCompletion 处理 `ccr completion ...`。
+func runCompletion(args []string, out io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "用法: ccr completion <bash|zsh|powershell> | ccr completion install [shell] [--uninstall]")
+		return 1
+	}
+
+	if args[0] == "install" {
+		uninstall := false
+		shell := ""
+		for _, a := range args[1:] {
+			if a == "--uninstall" {
+				uninstall = true
+			} else {
+				shell = a
+			}
+		}
+		if shell == "" {
+			shell = completion.DetectShell()
+		}
+		if shell == "" {
+			fmt.Fprintln(os.Stderr, "无法探测当前 shell，请显式指定：ccr completion install <bash|zsh|powershell>")
+			return 1
+		}
+		if uninstall {
+			changed, path, err := completion.Uninstall(shell)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			if changed {
+				fmt.Fprintf(out, "已从 %s 移除补全。重开终端生效。\n", path)
+			} else {
+				fmt.Fprintf(out, "%s 中未发现补全，无需移除。\n", path)
+			}
+			return 0
+		}
+		changed, path, err := completion.Install(shell)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if changed {
+			fmt.Fprintf(out, "已把补全写入 %s。重开终端或 source 它生效。\n", path)
+		} else {
+			fmt.Fprintf(out, "%s 已包含补全，无需重复。\n", path)
+		}
+		return 0
+	}
+
+	// 否则 args[0] 当作 shell，打印脚本。
+	script, err := completion.Script(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Fprint(out, script)
+	return 0
+}
+
+// runAlias: 无参列出；`<别名> <目标>` 设置（校验目标可解析）。
+func runAlias(cfg config.Config, args []string, out io.Writer) int {
+	ov := overlay.LoadOverlay()
+	if len(args) == 0 {
+		keys := make([]string, 0, len(ov.Aliases))
+		for k := range ov.Aliases {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(out, "%-16s -> %s\n", k, ov.Aliases[k])
+		}
+		return 0
+	}
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "用法: ccr alias <别名> <目标profile>")
+		return 1
+	}
+	alias, target := args[0], args[1]
+	r, code := buildRegistry(cfg)
+	if code != 0 {
+		return code
+	}
+	if _, err := r.Resolve(target); err != nil {
+		fmt.Fprintln(os.Stderr, "别名目标无法解析:", err)
+		return 1
+	}
+	ov.Aliases[alias] = target
+	if err := overlay.SaveOverlay(ov); err != nil {
+		fmt.Fprintln(os.Stderr, "保存失败:", err)
+		return 1
+	}
+	fmt.Fprintf(out, "已设别名: %s -> %s\n", alias, target)
+	return 0
+}
+
+// runUnalias: 删一个别名。
+func runUnalias(args []string, out io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "用法: ccr unalias <别名>")
+		return 1
+	}
+	ov := overlay.LoadOverlay()
+	if _, ok := ov.Aliases[args[0]]; !ok {
+		fmt.Fprintf(os.Stderr, "没有别名 %q\n", args[0])
+		return 1
+	}
+	delete(ov.Aliases, args[0])
+	if err := overlay.SaveOverlay(ov); err != nil {
+		fmt.Fprintln(os.Stderr, "保存失败:", err)
+		return 1
+	}
+	fmt.Fprintf(out, "已删别名: %s\n", args[0])
+	return 0
+}
+
+// runDefault: 无参打印当前默认；`<目标>` 设置（校验可解析）。
+func runDefault(cfg config.Config, args []string, out io.Writer) int {
+	ov := overlay.LoadOverlay()
+	if len(args) == 0 {
+		if ov.Default == "" {
+			fmt.Fprintln(out, "（未设默认）用 `ccr default <名字>` 设置，之后 `ccr .` 直启。")
+		} else {
+			fmt.Fprintln(out, ov.Default)
+		}
+		return 0
+	}
+	target := args[0]
+	r, code := buildRegistry(cfg)
+	if code != 0 {
+		return code
+	}
+	if _, err := r.Resolve(target); err != nil {
+		fmt.Fprintln(os.Stderr, "默认目标无法解析:", err)
+		return 1
+	}
+	ov.Default = target
+	if err := overlay.SaveOverlay(ov); err != nil {
+		fmt.Fprintln(os.Stderr, "保存失败:", err)
+		return 1
+	}
+	fmt.Fprintf(out, "已设默认: %s（`ccr .` 直启）\n", target)
+	return 0
+}
+
 // printUsage 打印帮助。
 func printUsage(out io.Writer) {
 	fmt.Fprint(out, `ccr — 用选定 provider 的环境变量启动 claude
 
 用法:
-  ccr                      交互式选择一个配置并启动
-  ccr <名字> [claude参数]   按名字直启，多余参数透传给 claude
-  ccr ls                   列出所有配置（两来源）
-  ccr show <名字> [--reveal] 查看某配置（默认 token 打码）
-  ccr edit <名字>           用 $EDITOR 编辑/新建自定义配置
+  ccr                          交互式选择一个配置并启动
+  ccr <名字|别名|前缀> [claude参数]  按名/别名/模糊命中启动，多余参数透传给 claude
+  ccr -                        重跑上次用的配置
+  ccr .                        跑默认配置（先 ccr default 设过）
+  ccr ls                       列出所有配置（两来源）
+  ccr show <名字> [--reveal]    查看某配置（默认 token 打码）
+  ccr edit <名字>              用 $EDITOR 编辑/新建自定义配置
+  ccr alias [<别名> <目标>]     列出 / 设置别名
+  ccr unalias <别名>           删除别名
+  ccr default [<名字>]          查看 / 设置默认配置
+  ccr completion <shell>       打印补全脚本（bash/zsh/powershell）
+  ccr completion install [shell] [--uninstall]
+                               一键装/卸补全到当前 shell 配置
 
 配置来源: cc-switch 库 + 自定义目录（~/.ccr/profiles/*.json）
+元数据:   别名/默认存 ~/.ccr/overlay.json，上次用的存 ~/.ccr/state.json
 `)
 }
