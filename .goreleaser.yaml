@@ -55,6 +55,7 @@ changelog:
       order: 999
   filters:
     exclude:
+      - "^Merge "
       - "^docs:"
       - "^test:"
       - "^chore:"
