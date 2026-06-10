@@ -185,6 +185,33 @@ func (c *capturePauser) Pause(_ Segment, prevOutput string) (Decision, string, e
 	return c.d, "", nil
 }
 
+func TestOrchestrate_isolate跑在worktree(t *testing.T) {
+	repo := initRepo(t)
+	var seenWorkdir string
+	c := Chain{
+		Name:    "t",
+		Isolate: true,
+		Workdir: repo,
+		Segments: []Segment{{Name: "a", Profile: "strong", Prompt: "x"}},
+	}
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		seenWorkdir = spec.Workdir
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if seenWorkdir == repo || seenWorkdir == "." {
+		t.Errorf("isolate 时段应跑在 worktree 而非原目录: %q", seenWorkdir)
+	}
+	// worktree 在 Run 结束时已被 cleanup 移除
+	if _, err := os.Stat(seenWorkdir); !os.IsNotExist(err) {
+		t.Errorf("Run 结束后 worktree 应已清理: %q", seenWorkdir)
+	}
+}
+
 func TestOrchestrate_放行点展示判定(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".ccr-chain"), 0o755)

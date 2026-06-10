@@ -33,6 +33,14 @@ func (o *Orchestrator) Run(c Chain) error {
 	if workdir == "" {
 		workdir = "."
 	}
+	if c.Isolate {
+		wt, cleanup, err := CreateWorktree(workdir, sanitize(c.Name))
+		if err != nil {
+			return fmt.Errorf("隔离 worktree 失败（当前目录需为 git 仓库）: %w", err)
+		}
+		defer cleanup()
+		workdir = wt
+	}
 	var prev string
 	for i := 0; i < len(c.Segments); i++ {
 		seg := c.Segments[i]
