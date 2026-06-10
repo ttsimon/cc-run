@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 
 	"github.com/ttsimon/cc-run/internal/chain"
 	"github.com/ttsimon/cc-run/internal/completion"
@@ -55,6 +56,8 @@ func Execute(args []string) int {
 			return runEdit(cfg, args[1:])
 		case "doctor":
 			return runDoctor(cfg, args[1:], os.Stdout)
+		case "__chain_guard":
+			return runChainGuard(os.Stdin, os.Stderr)
 		case "chain":
 			return runChain(cfg, args[1:], os.Stdout)
 		case "completion":
@@ -491,6 +494,18 @@ func runChain(cfg config.Config, args []string, out io.Writer) int {
 		return 1
 	}
 	fmt.Fprintln(out, "chain 完成:", c.Name)
+	return 0
+}
+
+// runChainGuard: PreToolUse 钩子调用；命中黑名单（CCR_CHAIN_DENY 换行分隔）则退 2 阻止。
+func runChainGuard(in io.Reader, errOut io.Writer) int {
+	raw, _ := io.ReadAll(in)
+	cmd := chain.CommandFromHookInput(raw)
+	denylist := strings.Split(os.Getenv("CCR_CHAIN_DENY"), "\n")
+	if chain.Denied(cmd, denylist) {
+		fmt.Fprintf(errOut, "ccr: 命令命中红线黑名单，已拦截：%s\n", cmd)
+		return 2
+	}
 	return 0
 }
 

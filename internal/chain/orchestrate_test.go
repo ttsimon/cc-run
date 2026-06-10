@@ -212,6 +212,29 @@ func TestOrchestrate_isolate跑在worktree(t *testing.T) {
 	}
 }
 
+func TestOrchestrate_段带settings与黑名单env(t *testing.T) {
+	dir := t.TempDir()
+	c := Chain{Workdir: dir, Segments: []Segment{
+		{Name: "a", Profile: "strong", Prompt: "x", DenyCommands: []string{"custom-bad"}},
+	}}
+	var seen runSpec
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { seen = spec; return "o", 0, nil }
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if seen.SettingsPath == "" {
+		t.Error("应生成 settings 路径")
+	}
+	if !strings.Contains(seen.Env["CCR_CHAIN_DENY"], "rm -rf") {
+		t.Error("env 应含默认黑名单")
+	}
+	if !strings.Contains(seen.Env["CCR_CHAIN_DENY"], "custom-bad") {
+		t.Error("env 应含段追加项")
+	}
+}
+
 func TestOrchestrate_放行点展示判定(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".ccr-chain"), 0o755)

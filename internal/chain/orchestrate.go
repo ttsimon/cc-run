@@ -2,6 +2,9 @@ package chain
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/ttsimon/cc-run/internal/registry"
 )
@@ -41,6 +44,11 @@ func (o *Orchestrator) Run(c Chain) error {
 		defer cleanup()
 		workdir = wt
 	}
+	ccrPath := "ccr"
+	if exe, err := os.Executable(); err == nil {
+		ccrPath = exe
+	}
+
 	var prev string
 	for i := 0; i < len(c.Segments); i++ {
 		seg := c.Segments[i]
@@ -53,11 +61,26 @@ func (o *Orchestrator) Run(c Chain) error {
 		if seg.Review {
 			renderedPrompt += ReviewInstruction()
 		}
+		// 安全：合并黑名单经 env 传给 guard；每段生成一个带 PreToolUse 钩子的 settings。
+		env := map[string]string{}
+		for k, v := range p.Env {
+			env[k] = v
+		}
+		env["CCR_CHAIN_DENY"] = strings.Join(MergeDenylist(DefaultDenylist(), seg.DenyCommands), "\n")
+
+		settingsPath := ""
+		settingsDir := filepath.Join(workdir, ".ccr-chain")
+		if err := os.MkdirAll(settingsDir, 0o755); err == nil {
+			settingsPath = filepath.Join(settingsDir, "settings-"+sanitize(seg.Name)+".json")
+			_ = os.WriteFile(settingsPath, []byte(SettingsJSON(ccrPath)), 0o644)
+		}
+
 		spec := runSpec{
-			Prompt:     renderedPrompt,
-			AllowTools: seg.AllowTools,
-			Workdir:    workdir,
-			Env:        p.Env,
+			Prompt:       renderedPrompt,
+			AllowTools:   seg.AllowTools,
+			Workdir:      workdir,
+			SettingsPath: settingsPath,
+			Env:          env,
 		}
 		out, code, err := o.runSegment(spec, seg)
 		if err != nil {

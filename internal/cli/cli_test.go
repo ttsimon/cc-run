@@ -113,3 +113,21 @@ func TestRunChain_文件不存在报错(t *testing.T) {
 		t.Error("文件不存在应非 0")
 	}
 }
+
+func TestRunChainGuard_命中退2(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "rm -rf\ngit push")
+	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 2 {
+		t.Errorf("命中应退 2, got %d", code)
+	}
+}
+
+func TestRunChainGuard_未命中退0(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "rm -rf")
+	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"ls -la"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 0 {
+		t.Errorf("未命中应退 0, got %d", code)
+	}
+}
