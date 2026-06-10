@@ -62,8 +62,17 @@ func (o *Orchestrator) Run(c Chain) error {
 
 		// 放行点（非 Auto，且后面还有段）
 		if !o.Auto && i+1 < len(c.Segments) {
+			info := prev
+			if seg.Review {
+				switch ReadVerdict(workdir) {
+				case VerdictPass:
+					info += "\n[判定] pass ✓"
+				case VerdictNeedsWork:
+					info += "\n[判定] needs-work —— 下一段建议放行修复"
+				}
+			}
 			next := c.Segments[i+1]
-			d, edited, perr := o.Pauser.Pause(next, prev)
+			d, edited, perr := o.Pauser.Pause(next, info)
 			if perr != nil {
 				return perr
 			}

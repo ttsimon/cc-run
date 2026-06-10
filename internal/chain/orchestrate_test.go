@@ -1,6 +1,8 @@
 package chain
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -138,5 +140,71 @@ func TestOrchestrate_review段追加指令(t *testing.T) {
 	}
 	if !strings.Contains(seen, ".ccr-chain/verdict") {
 		t.Errorf("review 段 prompt 应被追加判定指令: %q", seen)
+	}
+}
+
+func TestOrchestrate_可选段auto下照跑(t *testing.T) {
+	c := Chain{Segments: []Segment{
+		{Name: "impl", Profile: "cheap", Prompt: "x"},
+		{Name: "fix", Profile: "cheap", Prompt: "y", Optional: true},
+	}}
+	var ran []string
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { ran = append(ran, seg.Name); return "o", 0, nil }
+	o.Run(c)
+	if strings.Join(ran, ",") != "impl,fix" {
+		t.Errorf("auto 下可选段应照跑: %v", ran)
+	}
+}
+
+func TestOrchestrate_可选段非auto默认跳过(t *testing.T) {
+	c := Chain{Segments: []Segment{
+		{Name: "impl", Profile: "cheap", Prompt: "x"},
+		{Name: "fix", Profile: "cheap", Prompt: "y", Optional: true},
+	}}
+	var ran []string
+	o := NewOrchestrator(testReg())
+	o.Auto = false
+	o.Pauser = &fakePauser{seq: []Decision{DecisionSkip}}
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { ran = append(ran, seg.Name); return "o", 0, nil }
+	o.Run(c)
+	if strings.Join(ran, ",") != "impl" {
+		t.Errorf("非 auto 跳过可选段后只应跑 impl: %v", ran)
+	}
+}
+
+// capturePauser 记录它收到的展示文本。
+type capturePauser struct {
+	got string
+	d   Decision
+}
+
+func (c *capturePauser) Pause(_ Segment, prevOutput string) (Decision, string, error) {
+	c.got = prevOutput
+	return c.d, "", nil
+}
+
+func TestOrchestrate_放行点展示判定(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".ccr-chain"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".ccr-chain", "verdict"), []byte("needs-work"), 0o644)
+	c := Chain{
+		Workdir: dir,
+		Segments: []Segment{
+			{Name: "review", Profile: "strong", Prompt: "审", Review: true},
+			{Name: "fix", Profile: "cheap", Prompt: "改", Optional: true},
+		},
+	}
+	cp := &capturePauser{d: DecisionProceed}
+	o := NewOrchestrator(testReg())
+	o.Auto = false
+	o.Pauser = cp
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { return "o", 0, nil }
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cp.got, "needs-work") {
+		t.Errorf("放行点应展示判定: %q", cp.got)
 	}
 }
