@@ -189,9 +189,9 @@ func TestOrchestrate_isolate跑在worktree(t *testing.T) {
 	repo := initRepo(t)
 	var seenWorkdir string
 	c := Chain{
-		Name:    "t",
-		Isolate: true,
-		Workdir: repo,
+		Name:     "t",
+		Isolate:  true,
+		Workdir:  repo,
 		Segments: []Segment{{Name: "a", Profile: "strong", Prompt: "x"}},
 	}
 	o := NewOrchestrator(testReg())
