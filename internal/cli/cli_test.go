@@ -101,3 +101,15 @@ func TestRunAlias_坏目标报错(t *testing.T) {
 		t.Error("坏目标应非 0 退出")
 	}
 }
+
+func TestRunChain_缺文件参数报错(t *testing.T) {
+	if code := Execute([]string{"chain"}); code == 0 {
+		t.Error("chain 缺文件应非 0")
+	}
+}
+
+func TestRunChain_文件不存在报错(t *testing.T) {
+	if code := Execute([]string{"chain", "no-such-file.yaml"}); code == 0 {
+		t.Error("文件不存在应非 0")
+	}
+}

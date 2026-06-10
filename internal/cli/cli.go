@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"sort"
 
+	"github.com/ttsimon/cc-run/internal/chain"
 	"github.com/ttsimon/cc-run/internal/completion"
 	"github.com/ttsimon/cc-run/internal/config"
 	"github.com/ttsimon/cc-run/internal/doctor"
@@ -54,6 +55,8 @@ func Execute(args []string) int {
 			return runEdit(cfg, args[1:])
 		case "doctor":
 			return runDoctor(cfg, args[1:], os.Stdout)
+		case "chain":
+			return runChain(cfg, args[1:], os.Stdout)
 		case "completion":
 			return runCompletion(args[1:], os.Stdout)
 		case "alias":
@@ -448,6 +451,46 @@ func runDoctor(cfg config.Config, args []string, out io.Writer) int {
 	if !allOK {
 		return 1
 	}
+	return 0
+}
+
+// runChain: ccr chain <file> [--auto]
+func runChain(cfg config.Config, args []string, out io.Writer) int {
+	auto := false
+	var file string
+	for _, a := range args {
+		switch a {
+		case "--auto":
+			auto = true
+		default:
+			file = a
+		}
+	}
+	if file == "" {
+		fmt.Fprintln(os.Stderr, "用法: ccr chain <chain.yaml> [--auto]")
+		return 1
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "读不到 chain 文件:", err)
+		return 1
+	}
+	c, err := chain.Parse(data)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	r, code := buildRegistry(cfg)
+	if code != 0 {
+		return code
+	}
+	o := chain.NewOrchestrator(r)
+	o.Auto = auto
+	if err := o.Run(c); err != nil {
+		fmt.Fprintln(os.Stderr, "chain 失败:", err)
+		return 1
+	}
+	fmt.Fprintln(out, "chain 完成:", c.Name)
 	return 0
 }
 
