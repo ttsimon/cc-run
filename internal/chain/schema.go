@@ -10,8 +10,8 @@ import (
 // Chain 是一条流水线。
 type Chain struct {
 	Name     string    `yaml:"name"`
-	Isolate  bool      `yaml:"isolate"`  // true 则在临时 git worktree 跑，可整体回滚
-	Workdir  string    `yaml:"workdir"`  // 工作目录，空=当前目录
+	Isolate  bool      `yaml:"isolate"` // true 则在临时 git worktree 跑，可整体回滚
+	Workdir  string    `yaml:"workdir"` // 工作目录，空=当前目录
 	Segments []Segment `yaml:"segments"`
 }
 
