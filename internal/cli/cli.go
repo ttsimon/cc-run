@@ -13,6 +13,7 @@ import (
 
 	"github.com/ttsimon/cc-run/internal/completion"
 	"github.com/ttsimon/cc-run/internal/config"
+	"github.com/ttsimon/cc-run/internal/doctor"
 	"github.com/ttsimon/cc-run/internal/launcher"
 	"github.com/ttsimon/cc-run/internal/overlay"
 	"github.com/ttsimon/cc-run/internal/profile"
@@ -51,6 +52,8 @@ func Execute(args []string) int {
 			return runShow(cfg, args[1:])
 		case "edit":
 			return runEdit(cfg, args[1:])
+		case "doctor":
+			return runDoctor(cfg, args[1:], os.Stdout)
 		case "completion":
 			return runCompletion(args[1:], os.Stdout)
 		case "alias":
@@ -412,6 +415,39 @@ func runDefault(cfg config.Config, args []string, out io.Writer) int {
 		return 1
 	}
 	fmt.Fprintf(out, "已设默认: %s（`ccr .` 直启）\n", target)
+	return 0
+}
+
+// runDoctor: 无参体检全部 profile；带名只检一个。
+func runDoctor(cfg config.Config, args []string, out io.Writer) int {
+	r, code := buildRegistry(cfg)
+	if code != 0 {
+		return code
+	}
+	var targets []profile.Profile
+	if len(args) > 0 {
+		p, err := r.Resolve(args[0])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		targets = []profile.Profile{p}
+	} else {
+		targets = r.List()
+	}
+	allOK := true
+	for _, p := range targets {
+		res := doctor.Check(p)
+		mark := "✓"
+		if !res.OK {
+			mark = "✗"
+			allOK = false
+		}
+		fmt.Fprintf(out, "%s %-20s %s\n", mark, res.Name, res.Detail)
+	}
+	if !allOK {
+		return 1
+	}
 	return 0
 }
 
