@@ -547,6 +547,8 @@ func printUsage(out io.Writer) {
   ccr alias [<别名> <目标>]     列出 / 设置别名
   ccr unalias <别名>           删除别名
   ccr default [<名字>]          查看 / 设置默认配置
+  ccr doctor [名字]            体检后端可达性（不带名=全部）
+  ccr chain <file> [--auto]    跑一条多后端流水线；ccr chain init 生成模板
   ccr completion <shell>       打印补全脚本（bash/zsh/powershell）
   ccr completion install [shell] [--uninstall]
                                一键装/卸补全到当前 shell 配置
