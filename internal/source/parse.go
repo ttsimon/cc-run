@@ -11,6 +11,7 @@ import (
 // settingsConfig 对应 cc-switch settings_config 与自定义文件的 JSON 形状。
 type settingsConfig struct {
 	Model string            `json:"model"`
+	Args  []string          `json:"args"`
 	Env   map[string]string `json:"env"`
 }
 
@@ -27,6 +28,7 @@ func ParseSettingsConfig(name string, src profile.Source, raw string) (profile.P
 		Name:    name,
 		Source:  src,
 		Model:   sc.Model,
+		Args:    sc.Args,
 		Env:     sc.Env,
 		BaseURL: sc.Env["ANTHROPIC_BASE_URL"],
 	}, nil
