@@ -1,0 +1,21 @@
+name: plan-impl-review
+isolate: true
+segments:
+  - name: plan
+    profile: 改成你的强模型profile名    # 如 cc-switch:opus
+    prompt: |
+      把目标拆成一份结构化计划写到 docs/plans/目标.md：
+      每步写清楚改哪个文件、做什么、怎么验证（阶段/任务/验证三件套）。
+    allow_tools: [Read, Write, Edit]
+  - name: implement
+    profile: 改成你的便宜模型profile名   # 如 custom:cheap
+    prompt: |
+      读 {{prev.output}} 指向的计划文件，逐步实现。严格照计划做，不要自行扩展。
+    allow_tools: [Read, Write, Edit, Bash]
+    deny_commands: ["git push"]
+  - name: review
+    profile: 改成另一家profile名
+    prompt: |
+      审查本次改动是否符合计划、有无明显 bug。
+    review: true
+    allow_tools: [Read, Bash]

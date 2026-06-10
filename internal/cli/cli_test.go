@@ -131,3 +131,22 @@ func TestRunChainGuard_未命中退0(t *testing.T) {
 		t.Errorf("未命中应退 0, got %d", code)
 	}
 }
+
+func TestRunChain_init生成模板(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir) // 切到临时目录，避免污染仓库
+	if code := Execute([]string{"chain", "init"}); code != 0 {
+		t.Fatalf("chain init 应成功, code=%d", code)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "plan-impl-review.chain.yaml")); err != nil {
+		t.Errorf("应生成模板文件: %v", err)
+	}
+}
+
+func TestRunChain_init未知模板报错(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if code := Execute([]string{"chain", "init", "nope"}); code == 0 {
+		t.Error("未知模板应非 0")
+	}
+}

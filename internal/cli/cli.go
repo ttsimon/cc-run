@@ -457,8 +457,31 @@ func runDoctor(cfg config.Config, args []string, out io.Writer) int {
 	return 0
 }
 
-// runChain: ccr chain <file> [--auto]
+// runChain: ccr chain init [模板名] | ccr chain <file> [--auto]
 func runChain(cfg config.Config, args []string, out io.Writer) int {
+	if len(args) > 0 && args[0] == "init" {
+		name := "plan-impl-review"
+		if len(args) > 1 {
+			name = args[1]
+		}
+		raw, ok := chain.Template(name)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "没有内置模板 %q（现有：plan-impl-review）\n", name)
+			return 1
+		}
+		dest := name + ".chain.yaml"
+		if _, err := os.Stat(dest); err == nil {
+			fmt.Fprintf(os.Stderr, "%s 已存在，不覆盖\n", dest)
+			return 1
+		}
+		if err := os.WriteFile(dest, []byte(raw), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Fprintf(out, "已生成 %s，改好里面的 profile 名后用 `ccr chain %s` 跑\n", dest, dest)
+		return 0
+	}
+
 	auto := false
 	var file string
 	for _, a := range args {
