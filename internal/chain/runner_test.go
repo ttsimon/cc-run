@@ -55,9 +55,11 @@ func TestRunSegment_捕获stdout并注入env(t *testing.T) {
 	r.Stderr = &errOut
 
 	out, code, err := r.RunSegment(runSpec{
-		Prompt:    "你好",
-		Env:       map[string]string{"ANTHROPIC_BASE_URL": "https://injected"},
-		ExtraArgs: []string{"-test.run=TestHelperProcess"},
+		Prompt: "你好",
+		Env:    map[string]string{"ANTHROPIC_BASE_URL": "https://injected"},
+		// "-test.run" 指定 helper；"--" 让 flag 包停止解析，
+		// 使 SegmentArgs 产生的 -p / --output-format 等旗标落入 os.Args 非旗标区。
+		ExtraArgs: []string{"-test.run=TestHelperProcess", "--"},
 	})
 	if err != nil {
 		t.Fatal(err)

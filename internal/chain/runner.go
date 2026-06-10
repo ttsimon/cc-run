@@ -68,8 +68,9 @@ func (r *Runner) RunSegment(spec runSpec) (string, int, error) {
 		path = found
 	}
 
-	args := SegmentArgs(spec.Prompt, spec.AllowTools, spec.Workdir, spec.SettingsPath)
-	args = append(args, spec.ExtraArgs...)
+	// ExtraArgs（仅测试注入）放在最前，确保 Go helper-process 模式中
+	// -test.run 旗标先于非测试旗标被解析。真实运行 ExtraArgs 为空，无影响。
+	args := append(spec.ExtraArgs, SegmentArgs(spec.Prompt, spec.AllowTools, spec.Workdir, spec.SettingsPath)...)
 
 	cmd := exec.Command(path, args...)
 	cmd.Env = launcher.ComposeEnv(r.Environ(), spec.Env)
