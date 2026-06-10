@@ -8,8 +8,9 @@ import (
 
 // Orchestrator 顺序执行一条链的各段。
 type Orchestrator struct {
-	reg  *registry.Registry
-	Auto bool // true=不停顿一条道跑到黑（Phase C 才有停顿）
+	reg    *registry.Registry
+	Auto   bool   // true=不停顿一条道跑到黑；false=每段后在放行点征询用户
+	Pauser Pauser // 放行点交互实现；默认 TermPauser
 
 	// runSegment 可注入以便测试；默认走真实 Runner。
 	runSegment func(spec runSpec, seg Segment) (string, int, error)
@@ -22,17 +23,20 @@ func NewOrchestrator(reg *registry.Registry) *Orchestrator {
 	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
 		return runner.RunSegment(spec)
 	}
+	o.Pauser = NewTermPauser()
 	return o
 }
 
-// Run 顺序跑完整条链。上段 stdout 注入下段 prompt 的 {{prev.output}}。
+// Run 顺序跑完整条链；非 Auto 时每段后在放行点征询用户。
 func (o *Orchestrator) Run(c Chain) error {
 	workdir := c.Workdir
 	if workdir == "" {
 		workdir = "."
 	}
 	var prev string
-	for i, seg := range c.Segments {
+	for i := 0; i < len(c.Segments); i++ {
+		seg := c.Segments[i]
+
 		p, err := o.reg.Resolve(seg.Profile)
 		if err != nil {
 			return fmt.Errorf("段 #%d(%q) 的 profile 解析失败: %w", i, seg.Name, err)
@@ -51,6 +55,26 @@ func (o *Orchestrator) Run(c Chain) error {
 			return fmt.Errorf("段 #%d(%q) 非 0 退出（%d），中止", i, seg.Name, code)
 		}
 		prev = out
+
+		// 放行点（非 Auto，且后面还有段）
+		if !o.Auto && i+1 < len(c.Segments) {
+			next := c.Segments[i+1]
+			d, edited, perr := o.Pauser.Pause(next, prev)
+			if perr != nil {
+				return perr
+			}
+			switch d {
+			case DecisionQuit:
+				return nil
+			case DecisionSkip:
+				i++ // 跳过下一段
+			case DecisionEdit:
+				if edited != "" {
+					c.Segments[i+1].Prompt = edited
+				}
+			case DecisionProceed:
+			}
+		}
 	}
 	return nil
 }
