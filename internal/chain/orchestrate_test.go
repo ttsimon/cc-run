@@ -126,3 +126,17 @@ func TestOrchestrate_跳过略过下一段(t *testing.T) {
 		t.Errorf("应跑 a,c（跳过 b）, got %v", ran)
 	}
 }
+
+func TestOrchestrate_review段追加指令(t *testing.T) {
+	c := Chain{Segments: []Segment{{Name: "r", Profile: "strong", Prompt: "审查", Review: true}}}
+	var seen string
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { seen = spec.Prompt; return "o", 0, nil }
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(seen, ".ccr-chain/verdict") {
+		t.Errorf("review 段 prompt 应被追加判定指令: %q", seen)
+	}
+}

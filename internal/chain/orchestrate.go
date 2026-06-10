@@ -41,8 +41,12 @@ func (o *Orchestrator) Run(c Chain) error {
 		if err != nil {
 			return fmt.Errorf("段 #%d(%q) 的 profile 解析失败: %w", i, seg.Name, err)
 		}
+		renderedPrompt := Render(seg.Prompt, prev)
+		if seg.Review {
+			renderedPrompt += ReviewInstruction()
+		}
 		spec := runSpec{
-			Prompt:     Render(seg.Prompt, prev),
+			Prompt:     renderedPrompt,
 			AllowTools: seg.AllowTools,
 			Workdir:    workdir,
 			Env:        p.Env,
