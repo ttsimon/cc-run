@@ -19,7 +19,8 @@ func testReg() *registry.Registry {
 
 func TestOrchestrate_顺序跑并交棒(t *testing.T) {
 	c := Chain{
-		Name: "t",
+		Name:    "t",
+		Workdir: t.TempDir(),
 		Segments: []Segment{
 			{Name: "a", Profile: "strong", Prompt: "first"},
 			{Name: "b", Profile: "cheap", Prompt: "用了上段: {{prev.output}}"},
@@ -47,7 +48,7 @@ func TestOrchestrate_顺序跑并交棒(t *testing.T) {
 }
 
 func TestOrchestrate_未知profile报错(t *testing.T) {
-	c := Chain{Segments: []Segment{{Name: "a", Profile: "nope", Prompt: "x"}}}
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{{Name: "a", Profile: "nope", Prompt: "x"}}}
 	o := NewOrchestrator(testReg())
 	o.Auto = true
 	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { return "", 0, nil }
@@ -57,7 +58,7 @@ func TestOrchestrate_未知profile报错(t *testing.T) {
 }
 
 func TestOrchestrate_段非零退出即停(t *testing.T) {
-	c := Chain{Segments: []Segment{
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{
 		{Name: "a", Profile: "strong", Prompt: "x"},
 		{Name: "b", Profile: "cheap", Prompt: "y"},
 	}}
@@ -93,7 +94,7 @@ func (f *fakePauser) Pause(_ Segment, _ string) (Decision, string, error) {
 }
 
 func TestOrchestrate_退出在放行点中止(t *testing.T) {
-	c := Chain{Segments: []Segment{
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{
 		{Name: "a", Profile: "strong", Prompt: "x"},
 		{Name: "b", Profile: "cheap", Prompt: "y"},
 	}}
@@ -111,7 +112,7 @@ func TestOrchestrate_退出在放行点中止(t *testing.T) {
 }
 
 func TestOrchestrate_跳过略过下一段(t *testing.T) {
-	c := Chain{Segments: []Segment{
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{
 		{Name: "a", Profile: "strong", Prompt: "x"},
 		{Name: "b", Profile: "cheap", Prompt: "y"},
 		{Name: "c", Profile: "strong", Prompt: "z"},
@@ -130,7 +131,7 @@ func TestOrchestrate_跳过略过下一段(t *testing.T) {
 }
 
 func TestOrchestrate_review段追加指令(t *testing.T) {
-	c := Chain{Segments: []Segment{{Name: "r", Profile: "strong", Prompt: "审查", Review: true}}}
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{{Name: "r", Profile: "strong", Prompt: "审查", Review: true}}}
 	var seen string
 	o := NewOrchestrator(testReg())
 	o.Auto = true
@@ -144,7 +145,7 @@ func TestOrchestrate_review段追加指令(t *testing.T) {
 }
 
 func TestOrchestrate_可选段auto下照跑(t *testing.T) {
-	c := Chain{Segments: []Segment{
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{
 		{Name: "impl", Profile: "cheap", Prompt: "x"},
 		{Name: "fix", Profile: "cheap", Prompt: "y", Optional: true},
 	}}
@@ -159,7 +160,7 @@ func TestOrchestrate_可选段auto下照跑(t *testing.T) {
 }
 
 func TestOrchestrate_可选段非auto默认跳过(t *testing.T) {
-	c := Chain{Segments: []Segment{
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{
 		{Name: "impl", Profile: "cheap", Prompt: "x"},
 		{Name: "fix", Profile: "cheap", Prompt: "y", Optional: true},
 	}}
