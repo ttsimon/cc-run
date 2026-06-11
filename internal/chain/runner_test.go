@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -43,8 +44,40 @@ func TestHelperProcess(t *testing.T) {
 			prompt = args[i+1]
 		}
 	}
-	os.Stdout.WriteString("PROMPT=" + prompt + "\nBASE=" + os.Getenv("ANTHROPIC_BASE_URL"))
+	wd, _ := os.Getwd()
+	os.Stdout.WriteString("PROMPT=" + prompt + "\nBASE=" + os.Getenv("ANTHROPIC_BASE_URL") + "\nCWD=" + wd)
 	os.Exit(0)
+}
+
+func TestRunSegment_在Workdir里运行(t *testing.T) {
+	// isolate 隔离的关键：子进程 cwd 必须是 spec.Workdir（worktree），
+	// 否则相对路径文件会落到调用者真实仓库里。
+	dir := t.TempDir()
+	want, err := filepath.EvalSymlinks(dir) // macOS 下 TempDir 可能含符号链接
+	if err != nil {
+		want = dir
+	}
+
+	r := NewRunner()
+	r.ClaudePath = os.Args[0]
+	r.Environ = func() []string { return append(os.Environ(), "GO_WANT_HELPER_PROCESS=1") }
+	var errOut bytes.Buffer
+	r.Stderr = &errOut
+
+	out, code, err := r.RunSegment(runSpec{
+		Prompt:    "x",
+		Workdir:   dir,
+		ExtraArgs: []string{"-test.run=TestHelperProcess", "--"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 0 {
+		t.Errorf("退出码 %d", code)
+	}
+	if !strings.Contains(out, "CWD="+want) {
+		t.Errorf("子进程应在 Workdir(%q) 运行，实际输出: %q", want, out)
+	}
 }
 
 func TestRunSegment_捕获stdout并注入env(t *testing.T) {

@@ -73,6 +73,9 @@ func (r *Runner) RunSegment(spec runSpec) (string, int, error) {
 	args := append(spec.ExtraArgs, SegmentArgs(spec.Prompt, spec.AllowTools, spec.Workdir, spec.SettingsPath)...)
 
 	cmd := exec.Command(path, args...)
+	// 在段的工作目录里跑：isolate 时这是临时 worktree，模型写的相对路径文件
+	// 才会落到 worktree 而非调用者真实仓库。--add-dir 只放宽访问范围、不改 cwd。
+	cmd.Dir = spec.Workdir
 	cmd.Env = launcher.ComposeEnv(r.Environ(), spec.Env)
 	var out bytes.Buffer
 	cmd.Stdout = &out
