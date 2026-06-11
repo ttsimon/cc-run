@@ -49,14 +49,19 @@ func NewTermPauser() *TermPauser { return &TermPauser{In: os.Stdin, Out: os.Stdo
 
 func (t *TermPauser) Pause(nextSeg Segment, prevOutput string) (Decision, string, error) {
 	fmt.Fprintf(t.Out, "\n⏸  上段产出：\n%s\n", prevOutput)
-	fmt.Fprintf(t.Out, "下一段：%s（profile=%s）\n", nextSeg.Name, nextSeg.Profile)
+	opt := ""
+	if nextSeg.Optional {
+		opt = "（可选，可按 s 跳过）"
+	}
+	fmt.Fprintf(t.Out, "下一段：%s（profile=%s）%s\n", nextSeg.Name, nextSeg.Profile, opt)
 	fmt.Fprint(t.Out, "[回车=放行 / s=跳过 / e=改指令 / q=退出] > ")
-	line, _ := bufio.NewReader(t.In).ReadString('\n')
+	r := bufio.NewReader(t.In)
+	line, _ := r.ReadString('\n')
 	d := parseDecision(line)
 	if d == DecisionEdit {
 		fmt.Fprint(t.Out, "输入新指令（单行）> ")
-		edited, _ := bufio.NewReader(t.In).ReadString('\n')
-		return d, edited, nil
+		edited, _ := r.ReadString('\n')
+		return d, strings.TrimRight(edited, "\r\n"), nil
 	}
 	return d, "", nil
 }
