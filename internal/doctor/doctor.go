@@ -30,7 +30,7 @@ func Check(p profile.Profile) Result {
 	if err != nil {
 		return Result{Name: p.Name, OK: false, Detail: err.Error()}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	ok := resp.StatusCode < 500
 	return Result{Name: p.Name, OK: ok, Detail: fmt.Sprintf("HTTP %d", resp.StatusCode)}
 }

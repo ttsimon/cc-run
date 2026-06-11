@@ -10,8 +10,8 @@ import (
 func TestReadVerdict(t *testing.T) {
 	dir := t.TempDir()
 	vdir := filepath.Join(dir, ".ccr-chain")
-	os.MkdirAll(vdir, 0o755)
-	os.WriteFile(filepath.Join(vdir, "verdict"), []byte("needs-work\n"), 0o644)
+	_ = os.MkdirAll(vdir, 0o755)
+	_ = os.WriteFile(filepath.Join(vdir, "verdict"), []byte("needs-work\n"), 0o644)
 	v := ReadVerdict(dir)
 	if v != VerdictNeedsWork {
 		t.Errorf("got %v", v)

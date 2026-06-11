@@ -19,7 +19,7 @@ func initRepo(t *testing.T) string {
 			t.Fatalf("git %v: %v %s", args, err, out)
 		}
 	}
-	os.WriteFile(filepath.Join(dir, "f.txt"), []byte("hi"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "f.txt"), []byte("hi"), 0o644)
 	for _, args := range [][]string{{"add", "."}, {"commit", "-m", "init"}} {
 		cmd := exec.Command("git", args...)
 		cmd.Dir = dir
