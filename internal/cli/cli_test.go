@@ -132,6 +132,72 @@ func TestRunChainGuard_未命中退0(t *testing.T) {
 	}
 }
 
+func writeChainFile(t *testing.T, body string) string {
+	t.Helper()
+	dir := t.TempDir()
+	p := filepath.Join(dir, "c.chain.yaml")
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+const chainNoInput = "name: x\nsegments:\n  - name: a\n    profile: p\n    prompt: 做点事\n"
+const chainWithInput = "name: x\nsegments:\n  - name: a\n    profile: p\n    prompt: 做 {{input}}\n"
+
+// captureStderr 在 fn 执行期间把 os.Stderr 重定向到管道，返回捕获文本。
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+	fn()
+	_ = w.Close()
+	os.Stderr = orig
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
+}
+
+func TestRunChain_传input但链无占位报错(t *testing.T) {
+	f := writeChainFile(t, chainNoInput)
+	var code int
+	errOut := captureStderr(t, func() { code = Execute([]string{"chain", f, "--input", "加X"}) })
+	if code == 0 {
+		t.Error("传了 --input 但链无 {{input}} 应非 0")
+	}
+	if !strings.Contains(errOut, "需求会被忽略") {
+		t.Errorf("应因 input 无处可用而报错, stderr=%q", errOut)
+	}
+}
+
+func TestRunChain_链有占位但没传input报错(t *testing.T) {
+	f := writeChainFile(t, chainWithInput)
+	var code int
+	errOut := captureStderr(t, func() { code = Execute([]string{"chain", f}) })
+	if code == 0 {
+		t.Error("链含 {{input}} 但没传 --input 应非 0")
+	}
+	if !strings.Contains(errOut, "没传 --input") {
+		t.Errorf("应因缺 --input 而报错, stderr=%q", errOut)
+	}
+}
+
+func TestRunChain_i别名按input解析(t *testing.T) {
+	// -i 应把下一个参数当需求值消费；链无占位故触发"传了但没用"校验。
+	f := writeChainFile(t, chainNoInput)
+	var code int
+	errOut := captureStderr(t, func() { code = Execute([]string{"chain", f, "-i", "加X"}) })
+	if code == 0 || !strings.Contains(errOut, "需求会被忽略") {
+		t.Errorf("-i 应被当 input 旗标解析并触发校验, code=%d stderr=%q", code, errOut)
+	}
+}
+
 func TestRunChain_init生成模板(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir) // 切到临时目录，避免污染仓库

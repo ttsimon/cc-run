@@ -16,6 +16,13 @@ func TestTemplate_存在且可解析(t *testing.T) {
 	if !strings.Contains(raw, "{{prev.output}}") {
 		t.Error("模板应演示 prev.output 交棒")
 	}
+	if !strings.Contains(raw, "{{input}}") {
+		t.Error("模板应演示 {{input}}，使其能从命令行接需求")
+	}
+	c, _ := Parse([]byte(raw))
+	if !c.UsesInput() {
+		t.Error("内置模板应 UsesInput，配 ccr chain init ... --input 用")
+	}
 }
 
 func TestTemplate_未知名返回false(t *testing.T) {

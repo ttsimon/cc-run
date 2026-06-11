@@ -51,3 +51,27 @@ func TestValidate_段缺profile报错(t *testing.T) {
 		t.Error("缺 profile 应报错")
 	}
 }
+
+func TestUsesInput_含占位返回true(t *testing.T) {
+	c := Chain{Segments: []Segment{
+		{Prompt: "先看 {{prev.output}}"},
+		{Prompt: "实现 {{input}} 这个需求"},
+	}}
+	if !c.UsesInput() {
+		t.Error("有段含 {{input}} 应返回 true")
+	}
+}
+
+func TestUsesInput_含空格变体返回true(t *testing.T) {
+	c := Chain{Segments: []Segment{{Prompt: "做 {{ input }}"}}}
+	if !c.UsesInput() {
+		t.Error("应容忍 {{ input }} 空格变体")
+	}
+}
+
+func TestUsesInput_不含返回false(t *testing.T) {
+	c := Chain{Segments: []Segment{{Prompt: "纯文本 {{prev.output}}"}}}
+	if c.UsesInput() {
+		t.Error("不含 {{input}} 应返回 false")
+	}
+}

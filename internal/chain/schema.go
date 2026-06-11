@@ -3,6 +3,7 @@ package chain
 
 import (
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -36,6 +37,17 @@ func Parse(data []byte) (Chain, error) {
 		return Chain{}, err
 	}
 	return c, nil
+}
+
+// UsesInput 报告是否有任一段 prompt 含 {{input}} 占位（容忍内部空格）。
+// CLI 据此校验 --input 与占位符是否配对。
+func (c Chain) UsesInput() bool {
+	for _, s := range c.Segments {
+		if strings.Contains(s.Prompt, "{{input}}") || strings.Contains(s.Prompt, "{{ input }}") {
+			return true
+		}
+	}
+	return false
 }
 
 // Validate 校验基本约束。

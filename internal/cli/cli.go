@@ -478,22 +478,30 @@ func runChain(cfg config.Config, args []string, out io.Writer) int {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
-		fmt.Fprintf(out, "已生成 %s，改好里面的 profile 名后用 `ccr chain %s` 跑\n", dest, dest)
+		fmt.Fprintf(out, "已生成 %s，改好里面的 profile 名后用 `ccr chain %s --input \"你的需求\"` 跑\n", dest, dest)
 		return 0
 	}
 
 	auto := false
-	var file string
-	for _, a := range args {
-		switch a {
+	inputProvided := false
+	var input, file string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
 		case "--auto":
 			auto = true
+		case "--input", "-i":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "--input 后面要跟需求文本")
+				return 1
+			}
+			i++
+			input, inputProvided = args[i], true
 		default:
-			file = a
+			file = args[i]
 		}
 	}
 	if file == "" {
-		fmt.Fprintln(os.Stderr, "用法: ccr chain <chain.yaml> [--auto]")
+		fmt.Fprintln(os.Stderr, `用法: ccr chain <chain.yaml> [--auto] [--input "需求"]`)
 		return 1
 	}
 	data, err := os.ReadFile(file)
@@ -506,12 +514,22 @@ func runChain(cfg config.Config, args []string, out io.Writer) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	// 需求与占位符必须配对，跑任何段之前 fail-fast，绝不静默丢需求。
+	switch {
+	case inputProvided && !c.UsesInput():
+		fmt.Fprintln(os.Stderr, "传了 --input 但链里没任何 prompt 用 {{input}}，需求会被忽略。请在某段 prompt 里加 {{input}}。")
+		return 1
+	case !inputProvided && c.UsesInput():
+		fmt.Fprintln(os.Stderr, `这条链有 prompt 用了 {{input}}，但没传 --input。用 ccr chain <file> --input "需求"。`)
+		return 1
+	}
 	r, code := buildRegistry(cfg)
 	if code != 0 {
 		return code
 	}
 	o := chain.NewOrchestrator(r)
 	o.Auto = auto
+	o.Input = input
 	if err := o.Run(c); err != nil {
 		fmt.Fprintln(os.Stderr, "chain 失败:", err)
 		return 1
@@ -548,7 +566,8 @@ func printUsage(out io.Writer) {
   ccr unalias <别名>           删除别名
   ccr default [<名字>]          查看 / 设置默认配置
   ccr doctor [名字]            体检后端可达性（不带名=全部）
-  ccr chain <file> [--auto]    跑一条多后端流水线；ccr chain init 生成模板
+  ccr chain <file> [--auto] [--input "需求"]
+                               跑一条多后端流水线（prompt 用 {{input}} 引需求）；ccr chain init 生成模板
   ccr completion <shell>       打印补全脚本（bash/zsh/powershell）
   ccr completion install [shell] [--uninstall]
                                一键装/卸补全到当前 shell 配置

@@ -13,6 +13,7 @@ import (
 type Orchestrator struct {
 	reg    *registry.Registry
 	Auto   bool   // true=不停顿一条道跑到黑；false=每段后在放行点征询用户
+	Input  string // 整链级需求；prompt 里 {{input}} 替换为它
 	Pauser Pauser // 放行点交互实现；默认 TermPauser
 
 	// runSegment 可注入以便测试；默认走真实 Runner。
@@ -57,7 +58,7 @@ func (o *Orchestrator) Run(c Chain) error {
 		if err != nil {
 			return fmt.Errorf("段 #%d(%q) 的 profile 解析失败: %w", i, seg.Name, err)
 		}
-		renderedPrompt := Render(seg.Prompt, prev)
+		renderedPrompt := Render(seg.Prompt, prev, o.Input)
 		if seg.Review {
 			renderedPrompt += ReviewInstruction()
 		}

@@ -47,6 +47,24 @@ func TestOrchestrate_顺序跑并交棒(t *testing.T) {
 	}
 }
 
+func TestOrchestrate_注入input到prompt(t *testing.T) {
+	c := Chain{
+		Workdir:  t.TempDir(),
+		Segments: []Segment{{Name: "a", Profile: "strong", Prompt: "做 {{input}} 这个需求"}},
+	}
+	var seen string
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.Input = "给登录页加记住我"
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { seen = spec.Prompt; return "o", 0, nil }
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if seen != "做 给登录页加记住我 这个需求" {
+		t.Errorf("段 prompt 应注入 input: %q", seen)
+	}
+}
+
 func TestOrchestrate_未知profile报错(t *testing.T) {
 	c := Chain{Workdir: t.TempDir(), Segments: []Segment{{Name: "a", Profile: "nope", Prompt: "x"}}}
 	o := NewOrchestrator(testReg())
@@ -153,7 +171,7 @@ func TestOrchestrate_可选段auto下照跑(t *testing.T) {
 	o := NewOrchestrator(testReg())
 	o.Auto = true
 	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { ran = append(ran, seg.Name); return "o", 0, nil }
-	o.Run(c)
+	_ = o.Run(c)
 	if strings.Join(ran, ",") != "impl,fix" {
 		t.Errorf("auto 下可选段应照跑: %v", ran)
 	}
@@ -169,7 +187,7 @@ func TestOrchestrate_可选段非auto默认跳过(t *testing.T) {
 	o.Auto = false
 	o.Pauser = &fakePauser{seq: []Decision{DecisionSkip}}
 	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { ran = append(ran, seg.Name); return "o", 0, nil }
-	o.Run(c)
+	_ = o.Run(c)
 	if strings.Join(ran, ",") != "impl" {
 		t.Errorf("非 auto 跳过可选段后只应跑 impl: %v", ran)
 	}
@@ -238,8 +256,8 @@ func TestOrchestrate_段带settings与黑名单env(t *testing.T) {
 
 func TestOrchestrate_放行点展示判定(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".ccr-chain"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".ccr-chain", "verdict"), []byte("needs-work"), 0o644)
+	_ = os.MkdirAll(filepath.Join(dir, ".ccr-chain"), 0o755)
+	_ = os.WriteFile(filepath.Join(dir, ".ccr-chain", "verdict"), []byte("needs-work"), 0o644)
 	c := Chain{
 		Workdir: dir,
 		Segments: []Segment{

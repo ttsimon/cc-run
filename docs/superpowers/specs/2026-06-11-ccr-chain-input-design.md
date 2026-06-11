@@ -55,6 +55,7 @@ ccr chain <file> [--auto] [--input "需求" | -i "需求"]
 - **`internal/chain/orchestrate.go`**：`Orchestrator` 加字段 `Input string`；`Render` 调用带上 `o.Input`。
 - **`internal/cli/cli.go` `runChain`**：解析 `--input`/`-i`；做上表两方向校验；把值塞进 `o.Input`。usage 串补 `--input`。
 - **`internal/cli` 顶层 help**：`ccr chain` 行补一句 `--input` 说明。
+- **`internal/chain/templates/plan-impl-review.yaml`**：第一段 `plan` 的 prompt 改用 `{{input}}` 接需求，使 `ccr chain init` 出来的模板即开即用（配 `--input`）；`chain init` 成功提示同步带上 `--input "你的需求"`。
 
 ## 测试
 
