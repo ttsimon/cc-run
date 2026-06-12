@@ -68,3 +68,21 @@ func TestWorktreeIsolator_SetupAndSeal(t *testing.T) {
 		t.Errorf("无残留不应补提交: %s -> %s", before, after)
 	}
 }
+
+func TestWorktreeIsolator_脏标签也能建worktree(t *testing.T) {
+	repo := initRepo(t)
+	iso, err := newIsolator(repo, "plan impl/review!")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := iso.(*worktreeIsolator)
+	if _, err := w.Setup(); err != nil {
+		t.Fatalf("脏标签经 sanitize 后应能建 worktree: %v", err)
+	}
+	if strings.ContainsAny(w.branch, " /!") {
+		// 分支名里允许有 '/'（ccr-chain/ 前缀），但 label 部分不应带空格/!
+	}
+	if !strings.Contains(w.branch, "ccr-chain/plan-impl-review-") {
+		t.Errorf("分支名应基于 sanitize 后的 label: %q", w.branch)
+	}
+}

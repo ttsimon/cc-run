@@ -25,7 +25,7 @@ type Isolator interface {
 // newIsolator 按 workdir 是否在 git 工作树内选择隔离策略。
 func newIsolator(workdir, label string) (Isolator, error) {
 	if isInsideWorkTree(workdir) {
-		return &worktreeIsolator{repo: workdir, label: label}, nil
+		return &worktreeIsolator{repo: workdir, label: sanitize(label)}, nil
 	}
 	return &copydirIsolator{src: workdir}, nil
 }
