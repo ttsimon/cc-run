@@ -330,6 +330,48 @@ func TestOrchestrate_段带settings与黑名单env(t *testing.T) {
 	}
 }
 
+func TestOrchestrate_放行点加厚含耗时(t *testing.T) {
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{
+		{Name: "a", Profile: "strong", Prompt: "x"},
+		{Name: "b", Profile: "cheap", Prompt: "y"},
+	}}
+	cp := &capturePauser{d: DecisionProceed}
+	o := NewOrchestrator(testReg())
+	o.Auto = false
+	o.Pauser = cp
+	o.Out = &strings.Builder{}
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { return "o", 0, nil }
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cp.got, "耗时") {
+		t.Errorf("放行点应含耗时: %q", cp.got)
+	}
+}
+
+func TestOrchestrate_打印段框(t *testing.T) {
+	var out strings.Builder
+	c := Chain{Workdir: t.TempDir(), Segments: []Segment{{Name: "impl", Profile: "strong", Prompt: "x"}}}
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.Out = &out
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { return "o", 0, nil }
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	s := out.String()
+	if !strings.Contains(s, "impl") || !strings.Contains(s, "1/1") {
+		t.Errorf("应打印段框（名+进度）: %q", s)
+	}
+}
+
+func TestOrchestrate_Level默认normal(t *testing.T) {
+	o := NewOrchestrator(testReg())
+	if o.Level != LevelNormal {
+		t.Errorf("默认级别应为 normal, got %v", o.Level)
+	}
+}
+
 func TestOrchestrate_放行点展示判定(t *testing.T) {
 	dir := t.TempDir()
 	_ = os.MkdirAll(filepath.Join(dir, ".ccr-chain"), 0o755)

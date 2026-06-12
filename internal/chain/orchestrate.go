@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ttsimon/cc-run/internal/registry"
+	"github.com/ttsimon/cc-run/internal/ui"
 )
 
 // Orchestrator 顺序执行一条链的各段。
@@ -17,6 +19,7 @@ type Orchestrator struct {
 	Input  string    // 整链级需求；prompt 里 {{input}} 替换为它
 	Pauser Pauser    // 放行点交互实现；默认 TermPauser
 	Out    io.Writer // 隔离结果/进度输出；nil 默认 os.Stdout
+	Level  Level     // 渲染详细度；默认 LevelNormal
 
 	// runSegment 可注入以便测试；默认走真实 Runner。
 	runSegment func(spec runSpec, seg Segment) (string, int, error)
@@ -27,10 +30,16 @@ func NewOrchestrator(reg *registry.Registry) *Orchestrator {
 	o := &Orchestrator{reg: reg}
 	runner := NewRunner()
 	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
-		return runner.RunSegment(spec, nil)
+		out := o.Out
+		if out == nil {
+			out = os.Stdout
+		}
+		rnd := &Renderer{Level: o.Level, TTY: ui.WriterIsTTY(out), Out: out}
+		return runner.RunSegment(spec, rnd)
 	}
 	o.Pauser = NewTermPauser()
 	o.Out = os.Stdout
+	o.Level = LevelNormal // 零值是 LevelQuiet，须显式设默认
 	return o
 }
 
@@ -90,6 +99,11 @@ func (o *Orchestrator) Run(c Chain) error {
 			_ = os.WriteFile(settingsPath, []byte(SettingsJSON(ccrPath)), 0o644)
 		}
 
+		fmt.Fprintf(out, "%s 段 %d/%d %s [%s]\n",
+			ui.Apply(ui.WriterIsTTY(out), ui.StyleSegment, ui.IconRun),
+			i+1, len(c.Segments), seg.Name, seg.Profile)
+
+		start := time.Now()
 		spec := runSpec{
 			Prompt:       renderedPrompt,
 			AllowTools:   seg.AllowTools,
@@ -107,6 +121,13 @@ func (o *Orchestrator) Run(c Chain) error {
 			return fmt.Errorf("段 #%d(%q) 非 0 退出（%d），中止", i, seg.Name, code)
 		}
 		prev = segOut
+		elapsed := time.Since(start).Round(time.Second)
+		fmt.Fprintf(out, "%s 段 %d/%d 完成 (%s)\n",
+			ui.Apply(ui.WriterIsTTY(out), ui.StyleOK, ui.IconOK),
+			i+1, len(c.Segments), elapsed)
+		if o.Auto && strings.TrimSpace(prev) != "" {
+			fmt.Fprintln(out, prev) // auto 无放行点，结果在此回显
+		}
 
 		if iso != nil {
 			if err := iso.SealSegment(seg.Name); err != nil {
@@ -129,6 +150,10 @@ func (o *Orchestrator) Run(c Chain) error {
 					info += "\n[判定] needs-work —— 下一段建议放行修复"
 				}
 			}
+			if ds := segmentDiffStat(workdir); ds != "" {
+				info += "\n本段改动:\n" + ds
+			}
+			info += fmt.Sprintf("\n耗时 %s", elapsed)
 			next := c.Segments[i+1]
 			d, edited, perr := o.Pauser.Pause(next, info)
 			if perr != nil {
@@ -168,6 +193,16 @@ func (o *Orchestrator) Run(c Chain) error {
 		}
 	}
 	return nil
+}
+
+// segmentDiffStat 返回隔离 worktree 里本段相对上一提交的 diff --stat；
+// 非 git / 无上一提交 / 出错时返回 ""（best-effort，不影响主流程）。
+func segmentDiffStat(workdir string) string {
+	out, err := gitIn(workdir, "diff", "--stat", "HEAD~1", "HEAD")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // abandon 在异常路径保留成果并打印取回位置（iso 为 nil 时无操作）。
