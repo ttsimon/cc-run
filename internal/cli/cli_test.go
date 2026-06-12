@@ -216,3 +216,15 @@ func TestRunChain_init未知模板报错(t *testing.T) {
 		t.Error("未知模板应非 0")
 	}
 }
+
+func TestRunChain_quiet和verbose互斥(t *testing.T) {
+	f := writeChainFile(t, chainNoInput)
+	var code int
+	errOut := captureStderr(t, func() { code = Execute([]string{"chain", f, "-q", "-v"}) })
+	if code == 0 {
+		t.Error("同时给 -q -v 应非 0")
+	}
+	if !strings.Contains(errOut, "-q") && !strings.Contains(errOut, "互斥") {
+		t.Errorf("应提示 -q/-v 互斥, stderr=%q", errOut)
+	}
+}

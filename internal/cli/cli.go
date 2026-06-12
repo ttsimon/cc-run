@@ -483,12 +483,18 @@ func runChain(cfg config.Config, args []string, out io.Writer) int {
 	}
 
 	auto := false
+	quiet := false
+	verbose := false
 	inputProvided := false
 	var input, file string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--auto":
 			auto = true
+		case "-q", "--quiet":
+			quiet = true
+		case "-v", "--verbose":
+			verbose = true
 		case "--input", "-i":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "--input 后面要跟需求文本")
@@ -500,8 +506,12 @@ func runChain(cfg config.Config, args []string, out io.Writer) int {
 			file = args[i]
 		}
 	}
+	if quiet && verbose {
+		fmt.Fprintln(os.Stderr, "-q 与 -v 互斥，只能选一个")
+		return 1
+	}
 	if file == "" {
-		fmt.Fprintln(os.Stderr, `用法: ccr chain <chain.yaml> [--auto] [--input "需求"]`)
+		fmt.Fprintln(os.Stderr, `用法: ccr chain <chain.yaml> [--auto] [--input "需求"] [-q | -v]`)
 		return 1
 	}
 	data, err := os.ReadFile(file)
@@ -530,6 +540,14 @@ func runChain(cfg config.Config, args []string, out io.Writer) int {
 	o := chain.NewOrchestrator(r)
 	o.Auto = auto
 	o.Input = input
+	switch {
+	case quiet:
+		o.Level = chain.LevelQuiet
+	case verbose:
+		o.Level = chain.LevelVerbose
+	default:
+		o.Level = chain.LevelNormal
+	}
 	if err := o.Run(c); err != nil {
 		fmt.Fprintln(os.Stderr, "chain 失败:", err)
 		return 1
@@ -566,8 +584,8 @@ func printUsage(out io.Writer) {
   ccr unalias <别名>           删除别名
   ccr default [<名字>]          查看 / 设置默认配置
   ccr doctor [名字]            体检后端可达性（不带名=全部）
-  ccr chain <file> [--auto] [--input "需求"]
-                               跑一条多后端流水线（prompt 用 {{input}} 引需求）；ccr chain init 生成模板
+  ccr chain <file> [--auto] [--input "需求"] [-q|-v]
+                               跑一条多后端流水线（-q 静默/-v 详细）；ccr chain init 生成模板
   ccr completion <shell>       打印补全脚本（bash/zsh/powershell）
   ccr completion install [shell] [--uninstall]
                                一键装/卸补全到当前 shell 配置
