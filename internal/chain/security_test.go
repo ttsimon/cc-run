@@ -27,6 +27,22 @@ func TestSettingsJSON_含PreToolUse与guard(t *testing.T) {
 	if !strings.Contains(s, "PreToolUse") || !strings.Contains(s, "__chain_guard") {
 		t.Errorf("settings 应含 PreToolUse 钩子调 __chain_guard: %s", s)
 	}
+	// matcher 必须覆盖 Windows 的 PowerShell 工具：经校准 claude 在 Windows 用
+	// PowerShell 工具而非 Bash，仅匹配 "Bash" 的钩子在 Windows 不触发。
+	if !strings.Contains(s, "Bash") || !strings.Contains(s, "PowerShell") {
+		t.Errorf("PreToolUse matcher 应同时覆盖 Bash 与 PowerShell, got: %s", s)
+	}
+}
+
+func TestDenied_大小写不敏感(t *testing.T) {
+	bl := DefaultDenylist()
+	// Windows PowerShell 大小写不敏感，RM 是 Remove-Item 别名；不区分大小写才拦得住。
+	if !Denied("RM -RF /tmp", bl) {
+		t.Error("大写 RM -RF 也应被拦")
+	}
+	if !Denied("Git Push origin", bl) {
+		t.Error("混合大小写 Git Push 也应被拦")
+	}
 }
 
 func TestCommandFromHookInput(t *testing.T) {

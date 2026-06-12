@@ -24,10 +24,13 @@ func MergeDenylist(base, extra []string) []string {
 	return append(append([]string{}, base...), extra...)
 }
 
-// Denied 报告 cmd 是否命中黑名单（任一项为其子串）。
+// Denied 报告 cmd 是否命中黑名单（任一项为其子串，大小写不敏感）。
+// 大小写不敏感是必要的：Windows PowerShell 不区分大小写，RM/Remove-Item 等
+// 大写变体否则可绕过红线。
 func Denied(cmd string, denylist []string) bool {
+	lc := strings.ToLower(cmd)
 	for _, d := range denylist {
-		if d != "" && strings.Contains(cmd, d) {
+		if d != "" && strings.Contains(lc, strings.ToLower(d)) {
 			return true
 		}
 	}
@@ -35,7 +38,11 @@ func Denied(cmd string, denylist []string) bool {
 }
 
 // SettingsJSON 生成传给 claude --settings 的内容：一个 PreToolUse 钩子，
-// 在 Bash 工具前调用 `<ccrPath> __chain_guard`。
+// 在 shell 工具前调用 `<ccrPath> __chain_guard`。
+//
+// matcher 用 `Bash|PowerShell`：已对 claude 2.1.161 校准——Windows 上 claude 用
+// PowerShell 工具而非 Bash，仅匹配 "Bash" 的钩子在 Windows 完全不触发（实测
+// 只有 PowerShell/正则 matcher 才命中 PowerShell 工具）。
 //
 // ⚠️ 集成边界：PreToolUse settings 结构、stdin 输入字段名、用退出码 2 阻止——
 // 按当前 Claude Code 钩子协议编写。实现/联调时对照 `claude` 文档核对字段，不符则改本函数与 hookInput。
@@ -43,7 +50,7 @@ func SettingsJSON(ccrPath string) string {
 	return fmt.Sprintf(`{
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [ { "type": "command", "command": %q } ] }
+      { "matcher": "Bash|PowerShell", "hooks": [ { "type": "command", "command": %q } ] }
     ]
   }
 }`, ccrPath+" __chain_guard")
