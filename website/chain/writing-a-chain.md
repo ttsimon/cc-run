@@ -38,7 +38,7 @@ segments:
 </div>
 
 ::: tip profile 字段的值
-`profile` 必须是 ccr 已知的 provider 名字——也就是 `ccr ls` 能列出来的名字，支持精确匹配、别名和模糊命中。详见 [配置与按名解析](../guide/profiles)。
+`profile` 必须是 CC RUN 已知的 provider 名字——也就是 `ccr ls` 能列出来的名字，支持精确匹配、别名和模糊命中。详见 [配置与按名解析](../guide/profiles)。
 :::
 
 ## 字段参考
@@ -57,7 +57,7 @@ segments:
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `name` | string | 是 | 段名，用于显示和日志 |
-| `profile` | string | 是 | ccr provider 名字，决定本段用哪个后端 |
+| `profile` | string | 是 | CC RUN provider 名字，决定本段用哪个后端 |
 | `prompt` | string | 是 | 发给 claude 的 prompt，可含占位符 |
 | `allow_tools` | string[] | 否 | 本段允许的工具白名单 |
 | `deny_commands` | string[] | 否 | 本段额外禁用的 shell 命令（叠加到内置默认） |
