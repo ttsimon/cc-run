@@ -441,6 +441,41 @@ func TestOrchestrate_Level默认normal(t *testing.T) {
 	}
 }
 
+// guard 的 settings 含 PreToolUse 钩子配置，不该让 agent 看见/篡改：必须写在
+// 工作目录之外（agent 写操作圈在 workdir 内，够不着），且 Run 结束后清理。
+func TestOrchestrate_settings在工作目录外(t *testing.T) {
+	dir := t.TempDir()
+	c := Chain{Workdir: dir, Segments: []Segment{{Name: "a", Profile: "strong", Prompt: "x"}}}
+	var seenPath string
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		seenPath = spec.SettingsPath
+		if spec.SettingsPath == "" {
+			t.Error("应生成 settings 路径")
+		} else {
+			if _, err := os.Stat(spec.SettingsPath); err != nil {
+				t.Errorf("段执行时 settings 应存在: %v", err)
+			}
+			if strings.HasPrefix(spec.SettingsPath, dir) {
+				t.Errorf("settings 不应落在工作目录内: %q (workdir=%q)", spec.SettingsPath, dir)
+			}
+		}
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".ccr-chain", "settings-a.json")); !os.IsNotExist(err) {
+		t.Error("工作目录里不应残留 settings 文件")
+	}
+	if seenPath != "" {
+		if _, err := os.Stat(seenPath); !os.IsNotExist(err) {
+			t.Errorf("Run 后临时 settings 应已清理: %q", seenPath)
+		}
+	}
+}
+
 func TestOrchestrate_放行点展示判定(t *testing.T) {
 	dir := t.TempDir()
 	_ = os.MkdirAll(filepath.Join(dir, ".ccr-chain"), 0o755)

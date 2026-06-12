@@ -71,6 +71,16 @@ func (o *Orchestrator) Run(c Chain) error {
 		ccrPath = exe
 	}
 
+	// guard 的 settings（含 PreToolUse 钩子配置）写到工作目录**之外**的临时处：
+	// agent 的写操作圈在 workdir 内，够不着这里，便不能看见/篡改自己的红线钩子。
+	// MkdirTemp 失败则退化为无 settings（无钩子，与原 best-effort 行为一致）。
+	settingsRoot, mkErr := os.MkdirTemp("", "ccr-chain-cfg-")
+	if mkErr == nil {
+		defer func() { _ = os.RemoveAll(settingsRoot) }()
+	} else {
+		settingsRoot = ""
+	}
+
 	// 据「最后一次审查」的判定决定收尾，不是「任一段曾 needs-work」——否则早段
 	// needs-work + 修复段 + 末段 pass 的链会被早段粘死、误走 Abandon 丢掉成果。
 	lastReviewNeedsWork := false
@@ -95,9 +105,8 @@ func (o *Orchestrator) Run(c Chain) error {
 		env["CCR_CHAIN_DENY"] = strings.Join(MergeDenylist(DefaultDenylist(), seg.DenyCommands), "\n")
 
 		settingsPath := ""
-		settingsDir := filepath.Join(workdir, ".ccr-chain")
-		if err := os.MkdirAll(settingsDir, 0o755); err == nil {
-			settingsPath = filepath.Join(settingsDir, "settings-"+sanitize(seg.Name)+".json")
+		if settingsRoot != "" {
+			settingsPath = filepath.Join(settingsRoot, "settings-"+sanitize(seg.Name)+".json")
 			_ = os.WriteFile(settingsPath, []byte(SettingsJSON(ccrPath)), 0o644)
 		}
 
