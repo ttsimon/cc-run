@@ -33,13 +33,10 @@ features:
 <div class="term-bar">
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
-<div class="term-body">
-$ ccr ls
+<pre>$ ccr ls
 kimi        (ccswitch)  默认 ·
 deepseek    (ccswitch)
 glm         (custom)    别名: g
-
 $ ccr deepseek            # 给当前终端注入 deepseek 后端再拉起 claude
-→ launching claude with provider: deepseek
-</div>
+→ launching claude with provider: deepseek</pre>
 </div>
