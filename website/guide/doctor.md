@@ -13,14 +13,12 @@ $ ccr doctor deepseek # 只检查一个
 <div class="term-bar">
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
-<div class="term-body">
-$ ccr doctor
+<pre>$ ccr doctor
 ✓ deepseek (ccswitch)    → https://api.deepseek.com/anthropic      200 OK
 ✓ kimi     (ccswitch)    → https://api.moonshot.cn/anthropic        200 OK
 ✗ my-old   (custom)      → https://my-old.example.com/anthropic     连接超时
 ──────────────────────────────────────────────────
-3 个配置，2 个正常，1 个异常
-</div>
+3 个配置，2 个正常，1 个异常</pre>
 </div>
 
 ## 输出怎么看
