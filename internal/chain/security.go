@@ -38,11 +38,13 @@ func Denied(cmd string, denylist []string) bool {
 }
 
 // SettingsJSON 生成传给 claude --settings 的内容：一个 PreToolUse 钩子，
-// 在 shell 工具前调用 `<ccrPath> __chain_guard`。
+// 每次工具调用前调用 `<ccrPath> __chain_guard`。
 //
-// matcher 用 `Bash|PowerShell`：已对 claude 2.1.161 校准——Windows 上 claude 用
-// PowerShell 工具而非 Bash，仅匹配 "Bash" 的钩子在 Windows 完全不触发（实测
-// 只有 PowerShell/正则 matcher 才命中 PowerShell 工具）。
+// matcher 用 catch-all（空串）而非工具名白名单：按名字匹配会漏掉没列进去的 shell
+// 工具——Windows 上 claude 用 `PowerShell`（不是 `Bash`），将来可能还有 `cmd` 或别的
+// 名字。空 matcher 对所有工具触发，再由 guard 内部按「是否有 command」过滤：非 shell
+// 工具以空 command 进来，Denied("") 恒 false，安全放行。已对 claude 2.1.161 校准：
+// 空 matcher 确实对工具触发。
 //
 // ⚠️ 集成边界：PreToolUse settings 结构、stdin 输入字段名、用退出码 2 阻止——
 // 按当前 Claude Code 钩子协议编写。实现/联调时对照 `claude` 文档核对字段，不符则改本函数与 hookInput。
@@ -50,7 +52,7 @@ func SettingsJSON(ccrPath string) string {
 	return fmt.Sprintf(`{
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash|PowerShell", "hooks": [ { "type": "command", "command": %q } ] }
+      { "matcher": "", "hooks": [ { "type": "command", "command": %q } ] }
     ]
   }
 }`, ccrPath+" __chain_guard")

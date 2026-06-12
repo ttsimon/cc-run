@@ -13,6 +13,10 @@ func TestDenied_命中内置默认(t *testing.T) {
 	if Denied("ls -la", bl) {
 		t.Error("普通命令不应被拦")
 	}
+	// catch-all matcher 下非 shell 工具（无 command）会以空串进 guard，必须放行。
+	if Denied("", bl) {
+		t.Error("空命令不应被拦（非 shell 工具放行）")
+	}
 }
 
 func TestDenied_合并段追加(t *testing.T) {
@@ -27,10 +31,11 @@ func TestSettingsJSON_含PreToolUse与guard(t *testing.T) {
 	if !strings.Contains(s, "PreToolUse") || !strings.Contains(s, "__chain_guard") {
 		t.Errorf("settings 应含 PreToolUse 钩子调 __chain_guard: %s", s)
 	}
-	// matcher 必须覆盖 Windows 的 PowerShell 工具：经校准 claude 在 Windows 用
-	// PowerShell 工具而非 Bash，仅匹配 "Bash" 的钩子在 Windows 不触发。
-	if !strings.Contains(s, "Bash") || !strings.Contains(s, "PowerShell") {
-		t.Errorf("PreToolUse matcher 应同时覆盖 Bash 与 PowerShell, got: %s", s)
+	// matcher 用 catch-all（空串）：钩子对所有工具触发，再由 guard 内部按是否有
+	// command 过滤。这样无论 claude 用 Bash/PowerShell/cmd/将来某新 shell 工具，
+	// 红线都不漏（按工具名白名单会漏掉没列进去的名字）。经校准空 matcher 确实触发。
+	if !strings.Contains(s, `"matcher": ""`) {
+		t.Errorf("PreToolUse 应用 catch-all 空 matcher 以覆盖所有 shell 工具名, got: %s", s)
 	}
 }
 
