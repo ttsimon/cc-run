@@ -12,12 +12,10 @@ $ ccr ls
 <div class="term-bar">
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
-<div class="term-body">
-$ ccr ls
+<pre>$ ccr ls
 kimi        (ccswitch)  默认 ·
 deepseek    (ccswitch)
-glm         (custom)    别名: g
-</div>
+glm         (custom)    别名: g</pre>
 </div>
 
 `(ccswitch)` 表示来自 cc-switch 数据库（只读），`(custom)` 表示来自自定义目录。
@@ -36,13 +34,10 @@ $ ccr de             # 模糊命中：唯一则直启，多个则弹选择器
 <div class="term-bar">
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
-<div class="term-body">
-$ ccr deepseek
+<pre>$ ccr deepseek
 → launching claude with provider: deepseek
-
   Welcome to Claude Code!
-  ...
-</div>
+  ...</pre>
 </div>
 
 ccr 会给当前终端注入 deepseek 的 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，然后直接拉起 `claude`。你在 Claude Code 里什么也不用改。
