@@ -123,6 +123,60 @@ func TestWorktreeIsolator_Abandon保留分支(t *testing.T) {
 	}
 }
 
+func TestCopydirIsolator_拷出拷回不删(t *testing.T) {
+	src := t.TempDir()
+	_ = os.WriteFile(filepath.Join(src, "keep.txt"), []byte("原始"), 0o644)
+	_ = os.WriteFile(filepath.Join(src, "gone.txt"), []byte("将被删"), 0o644)
+
+	c := &copydirIsolator{src: src}
+	dir, err := c.Setup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "keep.txt")); err != nil {
+		t.Errorf("快照应含 keep.txt: %v", err)
+	}
+	if err := c.SealSegment("x"); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "new.txt"), []byte("新增"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("改过"), 0o644)
+	_ = os.Remove(filepath.Join(dir, "gone.txt"))
+
+	if _, err := c.Integrate(); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(src, "new.txt")); string(b) != "新增" {
+		t.Errorf("新增文件应拷回, got %q", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(src, "keep.txt")); string(b) != "改过" {
+		t.Errorf("修改应拷回, got %q", b)
+	}
+	if _, err := os.Stat(filepath.Join(src, "gone.txt")); err != nil {
+		t.Errorf("删除不应镜像，gone.txt 应仍在: %v", err)
+	}
+}
+
+func TestCopydirIsolator_Abandon保留副本(t *testing.T) {
+	src := t.TempDir()
+	_ = os.WriteFile(filepath.Join(src, "a.txt"), []byte("x"), 0o644)
+	c := &copydirIsolator{src: src}
+	dir, err := c.Setup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	loc, err := c.Abandon()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loc != dir {
+		t.Errorf("Abandon 应返回副本目录, got %q want %q", loc, dir)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "a.txt")); err != nil {
+		t.Errorf("Abandon 应保留副本: %v", err)
+	}
+}
+
 func TestWorktreeIsolator_脏标签也能建worktree(t *testing.T) {
 	repo := initRepo(t)
 	iso, err := newIsolator(repo, "plan impl/review!")

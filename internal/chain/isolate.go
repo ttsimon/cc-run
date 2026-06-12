@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -142,7 +143,119 @@ type copydirIsolator struct {
 	dir string
 }
 
-func (c *copydirIsolator) Setup() (string, error)        { panic("not implemented") }
-func (c *copydirIsolator) SealSegment(name string) error { panic("not implemented") }
-func (c *copydirIsolator) Integrate() (string, error)    { panic("not implemented") }
-func (c *copydirIsolator) Abandon() (string, error)      { panic("not implemented") }
+func (c *copydirIsolator) Setup() (string, error) {
+	c.dir = filepath.Join(os.TempDir(), fmt.Sprintf("ccr-chain-%d", time.Now().UnixNano()))
+	if err := copyTree(c.src, c.dir); err != nil {
+		return "", fmt.Errorf("拷贝工作目录失败: %w", err)
+	}
+	return c.dir, nil
+}
+
+// SealSegment 对 copydir 无操作——文件就在副本里持久存在，天然不丢。
+func (c *copydirIsolator) SealSegment(string) error { return nil }
+
+func (c *copydirIsolator) Integrate() (string, error) {
+	n, err := copyChangedBack(c.dir, c.src)
+	if err != nil {
+		return "", fmt.Errorf("拷回成果失败: %w", err)
+	}
+	return fmt.Sprintf("成果已拷回原目录（%d 个文件）", n), nil
+}
+
+// Abandon 保留副本、不拷回、不删，返回副本路径供用户自行取用。
+func (c *copydirIsolator) Abandon() (string, error) {
+	return c.dir, nil
+}
+
+// copyTree 递归把 src 拷到 dst，跳过 .git 与 .ccr-chain。
+func copyTree(src, dst string) error {
+	return filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return os.MkdirAll(dst, 0o755)
+		}
+		top := strings.SplitN(filepath.ToSlash(rel), "/", 2)[0]
+		if top == ".git" || top == ".ccr-chain" {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		return copyFile(p, target)
+	})
+}
+
+// copyChangedBack 把 tmp 里相对 src 新增/改动的文件拷回 src；不镜像删除。返回拷回数。
+func copyChangedBack(tmp, src string) (int, error) {
+	count := 0
+	err := filepath.WalkDir(tmp, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(tmp, p)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		top := strings.SplitN(filepath.ToSlash(rel), "/", 2)[0]
+		if top == ".git" || top == ".ccr-chain" {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		target := filepath.Join(src, rel)
+		if sameContent(p, target) {
+			return nil
+		}
+		if err := copyFile(p, target); err != nil {
+			return err
+		}
+		count++
+		return nil
+	})
+	return count, err
+}
+
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(src); err == nil {
+		mode = info.Mode().Perm()
+	}
+	return os.WriteFile(dst, data, mode)
+}
+
+// sameContent 报告两文件内容是否一致；任一读失败视为不一致（宁可拷回）。
+func sameContent(a, b string) bool {
+	da, err := os.ReadFile(a)
+	if err != nil {
+		return false
+	}
+	db, err := os.ReadFile(b)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(da, db)
+}
