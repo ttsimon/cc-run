@@ -27,7 +27,7 @@ func NewOrchestrator(reg *registry.Registry) *Orchestrator {
 	o := &Orchestrator{reg: reg}
 	runner := NewRunner()
 	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
-		return runner.RunSegment(spec)
+		return runner.RunSegment(spec, nil)
 	}
 	o.Pauser = NewTermPauser()
 	o.Out = os.Stdout

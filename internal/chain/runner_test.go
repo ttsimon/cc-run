@@ -11,7 +11,7 @@ import (
 func TestSegmentArgs_基本(t *testing.T) {
 	got := SegmentArgs("照做", []string{"Read", "Write"}, "/tmp/wd", "")
 	j := strings.Join(got, " ")
-	for _, want := range []string{"-p", "照做", "--allowedTools", "Read,Write", "--add-dir", "/tmp/wd", "--output-format", "text"} {
+	for _, want := range []string{"-p", "照做", "--allowedTools", "Read,Write", "--add-dir", "/tmp/wd", "--output-format", "stream-json", "--verbose"} {
 		if !strings.Contains(j, want) {
 			t.Errorf("缺 %q: %v", want, got)
 		}
@@ -68,7 +68,7 @@ func TestRunSegment_在Workdir里运行(t *testing.T) {
 		Prompt:    "x",
 		Workdir:   dir,
 		ExtraArgs: []string{"-test.run=TestHelperProcess", "--"},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestRunSegment_捕获stdout并注入env(t *testing.T) {
 		// "-test.run" 指定 helper；"--" 让 flag 包停止解析，
 		// 使 SegmentArgs 产生的 -p / --output-format 等旗标落入 os.Args 非旗标区。
 		ExtraArgs: []string{"-test.run=TestHelperProcess", "--"},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

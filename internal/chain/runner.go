@@ -1,7 +1,7 @@
 package chain
 
 import (
-	"bytes"
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -19,7 +19,7 @@ import (
 // `claude --help` 确认 -p / --allowedTools / --add-dir / --output-format / --settings 存在，
 // 版本不同则只改这里的常量字符串。
 func SegmentArgs(prompt string, allowTools []string, workdir, settingsPath string) []string {
-	args := []string{"-p", prompt, "--output-format", "text", "--add-dir", workdir}
+	args := []string{"-p", prompt, "--output-format", "stream-json", "--verbose", "--add-dir", workdir}
 	if len(allowTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(allowTools, ","))
 	}
@@ -56,9 +56,10 @@ func NewRunner() *Runner {
 	}
 }
 
-// RunSegment 跑一段，返回 (stdout 文本, 退出码, error)。
-// 仅当无法启动 claude 时返回 error；子进程非 0 退出通过 code 透传。
-func (r *Runner) RunSegment(spec runSpec) (string, int, error) {
+// RunSegment 跑一段：流式解析 claude 的 stream-json，逐事件喂给 rnd 渲染，
+// 返回 (最终 result 文本, 退出码, error)。rnd 为 nil 时不渲染、仅抽取结果。
+// 无 result 事件时回退为整段 stdout（防脆）。
+func (r *Runner) RunSegment(spec runSpec, rnd *Renderer) (string, int, error) {
 	path := r.ClaudePath
 	if path == "" {
 		found, err := r.LookPath("claude")
@@ -68,26 +69,51 @@ func (r *Runner) RunSegment(spec runSpec) (string, int, error) {
 		path = found
 	}
 
-	// ExtraArgs（仅测试注入）放在最前，确保 Go helper-process 模式中
-	// -test.run 旗标先于非测试旗标被解析。真实运行 ExtraArgs 为空，无影响。
 	args := append(spec.ExtraArgs, SegmentArgs(spec.Prompt, spec.AllowTools, spec.Workdir, spec.SettingsPath)...)
 
 	cmd := exec.Command(path, args...)
-	// 在段的工作目录里跑：isolate 时这是临时 worktree，模型写的相对路径文件
-	// 才会落到 worktree 而非调用者真实仓库。--add-dir 只放宽访问范围、不改 cwd。
 	cmd.Dir = spec.Workdir
 	cmd.Env = launcher.ComposeEnv(r.Environ(), spec.Env)
-	var out bytes.Buffer
-	cmd.Stdout = &out
 	cmd.Stderr = r.Stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", -1, fmt.Errorf("接管 stdout 失败: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return "", -1, fmt.Errorf("启动 claude 失败: %w", err)
+	}
 
-	err := cmd.Run()
-	if err == nil {
-		return out.String(), 0, nil
+	var resultText string
+	var rawAll strings.Builder
+	reader := bufio.NewReader(stdout)
+	for {
+		line, rerr := reader.ReadString('\n')
+		if len(line) > 0 {
+			rawAll.WriteString(line)
+			for _, e := range ParseEventLine([]byte(line)) {
+				rnd.Render(e) // Renderer.Render 对 nil 接收者安全
+				if e.Kind == EventResult {
+					resultText = e.Text
+				}
+			}
+		}
+		if rerr != nil {
+			break
+		}
+	}
+
+	out := resultText
+	if out == "" {
+		out = strings.TrimSpace(rawAll.String()) // 防脆回退：无 result 事件
+	}
+
+	werr := cmd.Wait()
+	if werr == nil {
+		return out, 0, nil
 	}
 	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		return out.String(), exitErr.ExitCode(), nil
+	if errors.As(werr, &exitErr) {
+		return out, exitErr.ExitCode(), nil
 	}
-	return out.String(), -1, err
+	return out, -1, werr
 }
