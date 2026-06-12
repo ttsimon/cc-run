@@ -116,8 +116,25 @@ func (w *worktreeIsolator) SealSegment(name string) error {
 	}
 	return nil
 }
-func (w *worktreeIsolator) Integrate() (string, error) { panic("not implemented") }
-func (w *worktreeIsolator) Abandon() (string, error)   { panic("not implemented") }
+func (w *worktreeIsolator) Integrate() (string, error) {
+	// 先 ff-only；非 fast-forward 再尝试普通 merge；都失败则 abort 并报错（上层转 Abandon）。
+	if out, err := gitIn(w.repo, "merge", "--ff-only", w.branch); err != nil {
+		if out2, err2 := gitIn(w.repo, "merge", "--no-edit", w.branch); err2 != nil {
+			_, _ = gitIn(w.repo, "merge", "--abort")
+			return "", fmt.Errorf("合并成果失败（已 abort）: %v %s / %v %s", err, out, err2, out2)
+		}
+	}
+	// 成果已在用户分支，删临时目录与分支都不丢东西。
+	_, _ = gitIn(w.repo, "worktree", "remove", "--force", w.dir)
+	_, _ = gitIn(w.repo, "branch", "-D", w.branch)
+	return fmt.Sprintf("成果已合入当前分支（来自 %s）", w.branch), nil
+}
+
+func (w *worktreeIsolator) Abandon() (string, error) {
+	// 只移除临时目录，绝不删分支——提交都在分支上，成果可取回。
+	_, _ = gitIn(w.repo, "worktree", "remove", "--force", w.dir)
+	return fmt.Sprintf("分支 %s（git merge %s 取回 / 不要可 git branch -D %s）", w.branch, w.branch, w.branch), nil
+}
 
 // copydirIsolator 用副本目录隔离非 git 工作目录。
 type copydirIsolator struct {

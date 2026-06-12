@@ -69,6 +69,60 @@ func TestWorktreeIsolator_SetupAndSeal(t *testing.T) {
 	}
 }
 
+func TestWorktreeIsolator_Integrate合回并清理(t *testing.T) {
+	repo := initRepo(t)
+	w := &worktreeIsolator{repo: repo, label: "t"}
+	dir, err := w.Setup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "out.txt"), []byte("产物"), 0o644)
+	if err := w.SealSegment("impl"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Integrate(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "out.txt")); err != nil {
+		t.Errorf("Integrate 后原仓库应有 out.txt: %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("Integrate 后 worktree 目录应已移除")
+	}
+	br, _ := gitIn(repo, "branch", "--list", w.branch)
+	if strings.TrimSpace(string(br)) != "" {
+		t.Errorf("Integrate 成功后应删临时分支, still: %q", br)
+	}
+}
+
+func TestWorktreeIsolator_Abandon保留分支(t *testing.T) {
+	repo := initRepo(t)
+	w := &worktreeIsolator{repo: repo, label: "t"}
+	dir, err := w.Setup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "out.txt"), []byte("产物"), 0o644)
+	if err := w.SealSegment("impl"); err != nil {
+		t.Fatal(err)
+	}
+	loc, err := w.Abandon()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(loc, w.branch) {
+		t.Errorf("Abandon 应返回分支名, got %q", loc)
+	}
+	br, _ := gitIn(repo, "branch", "--list", w.branch)
+	if strings.TrimSpace(string(br)) == "" {
+		t.Errorf("Abandon 不应删分支")
+	}
+	show, _ := gitIn(repo, "show", w.branch+":out.txt")
+	if strings.TrimSpace(string(show)) != "产物" {
+		t.Errorf("分支应保有成果, got %q", show)
+	}
+}
+
 func TestWorktreeIsolator_脏标签也能建worktree(t *testing.T) {
 	repo := initRepo(t)
 	iso, err := newIsolator(repo, "plan impl/review!")
