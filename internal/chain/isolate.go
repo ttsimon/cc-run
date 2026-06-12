@@ -86,10 +86,38 @@ type worktreeIsolator struct {
 	dir    string
 }
 
-func (w *worktreeIsolator) Setup() (string, error)        { panic("not implemented") }
-func (w *worktreeIsolator) SealSegment(name string) error { panic("not implemented") }
-func (w *worktreeIsolator) Integrate() (string, error)    { panic("not implemented") }
-func (w *worktreeIsolator) Abandon() (string, error)      { panic("not implemented") }
+func (w *worktreeIsolator) Setup() (string, error) {
+	w.branch = fmt.Sprintf("ccr-chain/%s-%d", w.label, time.Now().Unix())
+	w.dir = filepath.Join(os.TempDir(), fmt.Sprintf("ccr-chain-%d", time.Now().UnixNano()))
+	if out, err := gitIn(w.repo, "worktree", "add", "-b", w.branch, w.dir); err != nil {
+		return "", fmt.Errorf("建 worktree 失败: %v %s", err, out)
+	}
+	// 运行产物目录不进提交：在 worktree 里忽略 .ccr-chain/。
+	cdir := filepath.Join(w.dir, ".ccr-chain")
+	if err := os.MkdirAll(cdir, 0o755); err == nil {
+		_ = os.WriteFile(filepath.Join(cdir, ".gitignore"), []byte("*\n"), 0o644)
+	}
+	return w.dir, nil
+}
+
+func (w *worktreeIsolator) SealSegment(name string) error {
+	out, err := gitIn(w.dir, "status", "--porcelain")
+	if err != nil {
+		return fmt.Errorf("查 worktree 状态失败: %v %s", err, out)
+	}
+	if strings.TrimSpace(string(out)) == "" {
+		return nil // agent 已自行提交（或无改动），无残留
+	}
+	if out, err := gitIn(w.dir, "add", "-A"); err != nil {
+		return fmt.Errorf("git add 失败: %v %s", err, out)
+	}
+	if out, err := gitIn(w.dir, "commit", "-m", "[ccr chain] "+name); err != nil {
+		return fmt.Errorf("git commit 失败: %v %s", err, out)
+	}
+	return nil
+}
+func (w *worktreeIsolator) Integrate() (string, error) { panic("not implemented") }
+func (w *worktreeIsolator) Abandon() (string, error)   { panic("not implemented") }
 
 // copydirIsolator 用副本目录隔离非 git 工作目录。
 type copydirIsolator struct {
