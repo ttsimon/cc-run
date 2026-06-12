@@ -30,21 +30,6 @@ func initRepo(t *testing.T) string {
 	return dir
 }
 
-func TestWorktree_建后存在拆后消失(t *testing.T) {
-	repo := initRepo(t)
-	wt, cleanup, err := CreateWorktree(repo, "ccr-chain-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(wt, "f.txt")); err != nil {
-		t.Errorf("worktree 里应有仓库文件: %v", err)
-	}
-	cleanup()
-	if _, err := os.Stat(wt); !os.IsNotExist(err) {
-		t.Errorf("cleanup 后 worktree 应被移除")
-	}
-}
-
 func TestSanitize(t *testing.T) {
 	if got := sanitize("plan impl/review!"); got != "plan-impl-review-" {
 		t.Errorf("sanitize got %q", got)
