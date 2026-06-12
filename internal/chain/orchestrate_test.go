@@ -307,6 +307,75 @@ func TestOrchestrate_isolate_段报错保留成果(t *testing.T) {
 	}
 }
 
+// 多审查段：早段 needs-work、末段 pass，应据末次判定合回（不能被早段 needs-work 粘死）。
+func TestOrchestrate_isolate_末次审查pass则合回(t *testing.T) {
+	repo := initRepo(t)
+	c := Chain{
+		Name:    "t",
+		Isolate: true,
+		Workdir: repo,
+		Segments: []Segment{
+			{Name: "r1", Profile: "strong", Prompt: "审1", Review: true},
+			{Name: "r2", Profile: "strong", Prompt: "审2", Review: true},
+		},
+	}
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.Out = &strings.Builder{}
+	verdicts := []string{"needs-work", "pass"}
+	n := 0
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		_ = os.WriteFile(filepath.Join(spec.Workdir, "out.txt"), []byte("成品"), 0o644)
+		cd := filepath.Join(spec.Workdir, ".ccr-chain")
+		_ = os.MkdirAll(cd, 0o755)
+		_ = os.WriteFile(filepath.Join(cd, "verdict"), []byte(verdicts[n]), 0o644)
+		n++
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(repo, "out.txt")); string(b) != "成品" {
+		t.Errorf("末次审查 pass 应把成果合回原仓库, got %q", b)
+	}
+}
+
+// 铁律回归：isolate 下用户在放行点退出，成果不合回但临时分支必须保留可取回。
+func TestOrchestrate_isolate_退出保留分支(t *testing.T) {
+	repo := initRepo(t)
+	c := Chain{
+		Name:    "t",
+		Isolate: true,
+		Workdir: repo,
+		Segments: []Segment{
+			{Name: "a", Profile: "strong", Prompt: "x"},
+			{Name: "b", Profile: "cheap", Prompt: "y"},
+		},
+	}
+	o := NewOrchestrator(testReg())
+	o.Auto = false
+	o.Pauser = &fakePauser{seq: []Decision{DecisionQuit}}
+	out := &strings.Builder{}
+	o.Out = out
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		_ = os.WriteFile(filepath.Join(spec.Workdir, "out.txt"), []byte("半成品"), 0o644)
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "out.txt")); !os.IsNotExist(err) {
+		t.Error("quit 不应把成果合回原仓库工作树")
+	}
+	br, _ := gitIn(repo, "branch", "--list", "ccr-chain/*")
+	if strings.TrimSpace(string(br)) == "" {
+		t.Error("quit 后临时分支应保留以便取回成果（铁律）")
+	}
+	if !strings.Contains(out.String(), "保留") {
+		t.Errorf("quit 应打印成果保留位置, got %q", out.String())
+	}
+}
+
 func TestOrchestrate_段带settings与黑名单env(t *testing.T) {
 	dir := t.TempDir()
 	c := Chain{Workdir: dir, Segments: []Segment{

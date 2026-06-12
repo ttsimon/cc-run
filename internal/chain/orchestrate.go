@@ -71,7 +71,9 @@ func (o *Orchestrator) Run(c Chain) error {
 		ccrPath = exe
 	}
 
-	needsWork := false
+	// 据「最后一次审查」的判定决定收尾，不是「任一段曾 needs-work」——否则早段
+	// needs-work + 修复段 + 末段 pass 的链会被早段粘死、误走 Abandon 丢掉成果。
+	lastReviewNeedsWork := false
 	var prev string
 	for i := 0; i < len(c.Segments); i++ {
 		seg := c.Segments[i]
@@ -135,8 +137,8 @@ func (o *Orchestrator) Run(c Chain) error {
 				return fmt.Errorf("段 #%d(%q) 成果固化失败: %w", i, seg.Name, err)
 			}
 		}
-		if seg.Review && ReadVerdict(workdir) == VerdictNeedsWork {
-			needsWork = true
+		if seg.Review {
+			lastReviewNeedsWork = ReadVerdict(workdir) == VerdictNeedsWork
 		}
 
 		// 放行点（非 Auto，且后面还有段）
@@ -179,7 +181,7 @@ func (o *Orchestrator) Run(c Chain) error {
 	}
 
 	if iso != nil {
-		if needsWork {
+		if lastReviewNeedsWork {
 			loc, _ := iso.Abandon()
 			fmt.Fprintf(out, "审查判定 needs-work，成果未自动合入，保留在 %s\n", loc)
 		} else {
