@@ -50,8 +50,8 @@
             background:rgba(0,0,0,.2); border-bottom:1px solid var(--vp-c-border); }
 .term-dot { width:12px; height:12px; border-radius:50%; }
 .term-dot.red{background:#ff5f57}.term-dot.yellow{background:#febc2e}.term-dot.green{background:#28c840}
-.term pre { margin:0; padding:18px 20px; font-family:var(--vp-font-family-mono);
-            font-size:.85rem; line-height:1.7; overflow-x:auto; white-space:pre; }
+.term pre,.term-body { margin:0; padding:18px 20px; font-family:var(--vp-font-family-mono);
+            font-size:.85rem; line-height:1.7; overflow-x:auto; white-space:pre; color:var(--vp-c-text-1); }
 
 @media (prefers-reduced-motion: reduce) {
   .VPFeature, .VPFeature:hover { transition: none; transform: none; }
