@@ -538,6 +538,7 @@ func runChain(cfg config.Config, args []string, out io.Writer) int {
 		return code
 	}
 	o := chain.NewOrchestrator(r)
+	o.Out = out // 转发调用方的 writer，别让编排器输出固定写死 os.Stdout（可测）
 	o.Auto = auto
 	o.Input = input
 	switch {

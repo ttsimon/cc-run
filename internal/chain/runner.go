@@ -13,7 +13,11 @@ import (
 )
 
 // SegmentArgs 构造传给 claude 的参数：headless 打印模式 + 工具白名单 + 目录范围 + 钩子设置。
-// settingsPath 为空时不加 --settings；allowTools 为空时不加 --allowedTools。
+// settingsPath 为空时不加 --settings。
+//
+// ⚠️ 安全：allowTools 为空时不加 --allowedTools，即放行 claude 的**默认全部工具**——
+// 不是「禁用所有工具」。段若想收紧权限必须显式列出 allow_tools（如审查段 [Read,Bash]）。
+// 省略该键 = 全开，是反直觉的脚枪。第 3 层命令黑名单钩子仍兜底，但白名单这层会失效。
 //
 // ⚠️ 集成边界：这些旗标名按当前 Claude Code CLI 编写。实现时跑一次
 // `claude --help` 确认 -p / --allowedTools / --add-dir / --output-format / --settings 存在，
