@@ -231,6 +231,82 @@ func TestOrchestrate_isolate跑在worktree(t *testing.T) {
 	}
 }
 
+// 事故回归：agent 没提交就结束，成果绝不能丢——isolate 成功应把产物合回原仓库。
+func TestOrchestrate_isolate成功合回成果(t *testing.T) {
+	repo := initRepo(t)
+	c := Chain{
+		Name:     "t",
+		Isolate:  true,
+		Workdir:  repo,
+		Segments: []Segment{{Name: "impl", Profile: "strong", Prompt: "x"}},
+	}
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.Out = &strings.Builder{}
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		_ = os.WriteFile(filepath.Join(spec.Workdir, "out.txt"), []byte("产物"), 0o644)
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(repo, "out.txt")); string(b) != "产物" {
+		t.Errorf("成功应把成果合回原仓库, got %q", b)
+	}
+}
+
+func TestOrchestrate_isolate_needswork不合回(t *testing.T) {
+	repo := initRepo(t)
+	c := Chain{
+		Name:    "t",
+		Isolate: true,
+		Workdir: repo,
+		Segments: []Segment{
+			{Name: "review", Profile: "strong", Prompt: "审", Review: true},
+		},
+	}
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.Out = &strings.Builder{}
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		_ = os.WriteFile(filepath.Join(spec.Workdir, "out.txt"), []byte("半成品"), 0o644)
+		cd := filepath.Join(spec.Workdir, ".ccr-chain")
+		_ = os.MkdirAll(cd, 0o755)
+		_ = os.WriteFile(filepath.Join(cd, "verdict"), []byte("needs-work"), 0o644)
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "out.txt")); !os.IsNotExist(err) {
+		t.Errorf("needs-work 不应把成果合回原仓库")
+	}
+}
+
+func TestOrchestrate_isolate_段报错保留成果(t *testing.T) {
+	repo := initRepo(t)
+	c := Chain{
+		Name:     "t",
+		Isolate:  true,
+		Workdir:  repo,
+		Segments: []Segment{{Name: "impl", Profile: "strong", Prompt: "x"}},
+	}
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	out := &strings.Builder{}
+	o.Out = out
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		_ = os.WriteFile(filepath.Join(spec.Workdir, "out.txt"), []byte("产物"), 0o644)
+		return "", 7, nil
+	}
+	if err := o.Run(c); err == nil {
+		t.Fatal("段非 0 退出应报错")
+	}
+	if !strings.Contains(out.String(), "保留") {
+		t.Errorf("报错应打印成果保留位置, got %q", out.String())
+	}
+}
+
 func TestOrchestrate_段带settings与黑名单env(t *testing.T) {
 	dir := t.TempDir()
 	c := Chain{Workdir: dir, Segments: []Segment{
