@@ -1,0 +1,58 @@
+/* ── 暗色（主打）── */
+.dark {
+  --vp-c-bg:        #0c0f17;
+  --vp-c-bg-alt:    #0a0d14;
+  --vp-c-bg-soft:   #121826;
+  --vp-c-bg-elv:    #161d2e;
+  --vp-c-text-1:    #e6ebf5;
+  --vp-c-text-2:    #94a3b8;
+  --vp-c-text-3:    #64748b;
+  --vp-c-divider:   #243049;
+  --vp-c-border:    #243049;
+  --vp-c-gutter:    #0a0d14;
+  --vp-c-brand-1:   #8ea8ff;
+  --vp-c-brand-2:   #7c9cff;
+  --vp-c-brand-3:   #5b7cf0;
+  --vp-c-brand-soft: rgba(124,156,255,0.14);
+  --ccr-accent:     #ffb86b;
+  --ccr-grad:       linear-gradient(120deg, #7c9cff 0%, #56e1c4 100%);
+}
+
+/* ── 明色（仅换品牌色）── */
+:root {
+  --vp-c-brand-1:   #4c6ef0;
+  --vp-c-brand-2:   #5b7cf0;
+  --vp-c-brand-3:   #7c9cff;
+  --vp-c-brand-soft: rgba(92,124,240,0.12);
+  --ccr-accent:     #d97706;
+  --ccr-grad:       linear-gradient(120deg, #5b7cf0 0%, #14b8a6 100%);
+
+  --vp-font-family-base: 'Inter','Segoe UI',system-ui,-apple-system,'Microsoft YaHei',sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono','Cascadia Code',Consolas,monospace;
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: var(--ccr-grad);
+
+  --vp-button-brand-bg: var(--vp-c-brand-3);
+  --vp-button-brand-hover-bg: var(--vp-c-brand-2);
+  --vp-button-brand-active-bg: var(--vp-c-brand-3);
+  --vp-button-brand-text: #ffffff;
+}
+
+/* feature 卡：大圆角 + hover 抬升转品牌边 */
+.VPFeature { border-radius: 14px; transition: transform .15s, border-color .15s; }
+.VPFeature:hover { transform: translateY(-2px); border-color: var(--vp-c-brand-2); }
+
+/* 终端卡 */
+.term { background: var(--vp-c-bg-soft); border:1px solid var(--vp-c-border);
+        border-radius:14px; overflow:hidden; margin: 24px 0; }
+.term-bar { display:flex; gap:6px; padding:12px 16px;
+            background:rgba(0,0,0,.2); border-bottom:1px solid var(--vp-c-border); }
+.term-dot { width:12px; height:12px; border-radius:50%; }
+.term-dot.red{background:#ff5f57}.term-dot.yellow{background:#febc2e}.term-dot.green{background:#28c840}
+.term pre { margin:0; padding:18px 20px; font-family:var(--vp-font-family-mono);
+            font-size:.85rem; line-height:1.7; overflow-x:auto; white-space:pre; }
+
+@media (prefers-reduced-motion: reduce) {
+  .VPFeature, .VPFeature:hover { transition: none; transform: none; }
+}
