@@ -47,12 +47,12 @@
 
 ## 安全：四层纵深
 
-1. git worktree / 干净分支隔离，可整体回滚。
+1. 可插拔隔离（Isolator）：git 目录用临时 worktree（每段 ccr 兜底提交，避免 agent 不提交导致丢失）；非 git 目录用 copydir 快照。结束三态——跑完且审查 pass → 本地 merge 合回当前分支并删临时分支；needs-work / 报错 / 用户退出 → 保留成果并打印取回路径，**绝不静默销毁**。详见 `specs/2026-06-11-ccr-chain-isolation-design.md`。
 2. 每段 `allow-tools` 白名单。
 3. `PreToolUse` 钩子做命令红线黑名单（ccr 内置默认 + 用户在 yaml 追加），命中即 halt。
 4. 写操作圈在工作目录内。
 
-> ⚠️ Windows 真沙箱弱，主要靠 ①（worktree 回滚）+ ③（钩子黑名单）兜底。
+> ⚠️ Windows 真沙箱弱，主要靠 ①（隔离 + 成果交回）+ ③（钩子黑名单）兜底。
 
 ## yaml 谁写（v0.3 范围）
 

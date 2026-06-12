@@ -19,7 +19,7 @@ Sources(来源)            Registry(合并)         Launcher(启动)
 
 - 两个配置来源：cc-switch 库（只读）+ 自定义目录 `~/.ccr/profiles/*.json`，合并为一个列表、标注来源、重名用 `来源:名字` 消歧。
 - **旁挂元数据层** `~/.ccr/overlay.json`（别名 + 默认）+ `~/.ccr/state.json`（上次用的）：cc-switch 库只读，别名/默认/上次写不回去，故另存一份；按名解析时叠加——特殊记号 `-`（上次）/ `.`（默认）、别名、模糊子串命中（唯一直启、多命中弹过滤选择器）。
-- **chain（v0.3）**：多后端 agent 流水线——无头 `claude -p` 分段、共享 git 工作目录 + `{{prev.output}}` 交棒、默认段间放行 / `--auto`、审查判定、命令黑名单 PreToolUse 钩子、isolate worktree 隔离。详见 `docs/superpowers/specs/2026-06-09-ccr-chain-design.md`。
+- **chain（v0.3）**：多后端 agent 流水线——无头 `claude -p` 分段、共享 git 工作目录 + `{{prev.output}}` 交棒、默认段间放行 / `--auto`、审查判定、命令黑名单 PreToolUse 钩子、可插拔隔离（worktree/copydir）+ 三态成果交回。详见 `docs/superpowers/specs/2026-06-09-ccr-chain-design.md`。
 - 纯逻辑（解析/合并/env 组装/参数）全部单元测试；拉起子进程用 Go helper-process 模式集成测试；TUI/editor 手动验证。
 
 ## 代码布局
