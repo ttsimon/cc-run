@@ -22,6 +22,18 @@
 - 一次性重排所有命令（ls/show/doctor…）的输出——样式层先建好、chain 先用，其余命令的采纳作为后续增量。
 - 成本/计费的精确核算（verbose 显 token 用量即可，不做账单）。
 
+**当前只渲染 `assistant`(tool_use/text) 与 `result` 两类事件**，其余 stream-json 事件经
+解析器 `default: return nil` 安全吞掉（鲁棒完备，非枚举完备——单次校准无法穷举所有事件类型）。
+以下**带内容**的事件是**故意没渲染**，非遗漏，将来要加厚观测时按此优先级取用：
+- **`rate_limit_event`（优先级最高）**：撞限额预警。现在静默吞掉，链跑一半撞限额不提示用户——
+  对 Pro 等有滚动窗口限额的场景实用。
+- **`user` / tool_result**：工具调用的**输出**（命令打印/读到的文件内容）。现在只显示工具
+  **调用**不显示**结果**。
+- **`result.is_error`**：API 级失败标志。现在只取 result 文本即往下走，进程退出码兜住多数、
+  但 API 内错可能漏。
+- 已知限制：thinking block 内容在 stream-json 中为空（仅 signature），故 verbose 的「思考行」
+  实取 `text` 叙述块而非思考文本（claude 2.1.161 校准，2026-06-12）。
+
 ## 架构：一条 stream-json 流 + 详细度过滤
 
 核心决策：**段一律用 `--output-format stream-json` 跑，ccr 解析这一条事件流；详细度只是渲染过滤器**，不为不同级别开不同的 claude 输出格式。
