@@ -37,7 +37,7 @@ $ ccr custom:DeepSeek        # 来自自定义目录的 DeepSeek
 
 ## Q: 模糊命中弹选择器了？
 
-多个 profile 匹配到同一个子串时，CC RUN 会弹出选择器让你挑一个。解决方法：
+多个 profile 匹配到同一个子串时，CC Run 会弹出选择器让你挑一个。解决方法：
 
 1. **输入更精确的名字**——少打几个字是图方便，但名字越精确越不容易冲突
 2. **设别名**——把常用的简写映射到确定目标：
@@ -134,18 +134,18 @@ $ ccr edit my-new-backend
 
 文件保存在 `~/.ccr/profiles/my-new-backend.json`。也可以手动在该目录下创建 JSON 文件，格式见 [配置文件与路径](./files)。
 
-## Q: CC RUN 和 cc-switch 怎么配合？
+## Q: CC Run 和 cc-switch 怎么配合？
 
 两者的定位互补，不冲突：
 
-| | cc-switch | CC RUN |
+| | cc-switch | CC Run |
 |------|-----------|-----|
 | 粒度 | 全局 | 当前终端 |
 | 配置存储 | SQLite（`~/.cc-switch/`） | JSON（`~/.ccr/profiles/`） |
 | 修改方式 | cc-switch 自己的命令 | `ccr edit` |
-| CC RUN 如何使用 | **只读**，自动读入 | 合并展示，同名消歧 |
+| CC Run 如何使用 | **只读**，自动读入 | 合并展示，同名消歧 |
 
-**一句话**：cc-switch 管"这台机器有哪些后端"，CC RUN 管"这个终端用哪个"。CC RUN 自动读取 cc-switch 的配置（不会修改），同时允许你通过自定义目录添加额外后端。
+**一句话**：cc-switch 管"这台机器有哪些后端"，CC Run 管"这个终端用哪个"。CC Run 自动读取 cc-switch 的配置（不会修改），同时允许你通过自定义目录添加额外后端。
 
 ## 更多信息
 

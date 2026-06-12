@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   base: '/cc-run/',
   lang: 'zh-CN',
-  title: 'CC RUN',
+  title: 'CC Run',
   description: '用选定 provider 的环境变量启动 claude——多开各用不同后端、互不干扰、不改全局配置。',
   lastUpdated: true,
   cleanUrls: true,

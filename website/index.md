@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: CC RUN
+  name: CC Run
   text: 给每个终端注入不同后端，再拉起 claude
   tagline: 同时多开、各用不同后端、互不干扰，且不改全局配置。
   actions:
@@ -9,7 +9,7 @@ hero:
       text: 快速上手
       link: /guide/getting-started
     - theme: alt
-      text: 为什么是 CC RUN
+      text: 为什么是 CC Run
       link: /guide/what-is-ccr
     - theme: alt
       text: GitHub
@@ -20,7 +20,7 @@ features:
     details: 每个终端各跑一次 ccr &lt;名&gt;，各用各的后端，并行不打架。
   - icon: 🔌
     title: 不改全局配置
-    details: 按终端会话注入 env——cc-switch 切的是全局，CC RUN 切的是这个 tab。
+    details: 按终端会话注入 env——cc-switch 切的是全局，CC Run 切的是这个 tab。
   - icon: ⛓️
     title: chain 多后端流水线
     details: 规划用强模型、实现用便宜模型、审查换一家，串起来跑。
