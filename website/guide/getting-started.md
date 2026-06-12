@@ -40,7 +40,7 @@ $ ccr de             # 模糊命中：唯一则直启，多个则弹选择器
   ...</pre>
 </div>
 
-ccr 会给当前终端注入 deepseek 的 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，然后直接拉起 `claude`。你在 Claude Code 里什么也不用改。
+CC RUN 会给当前终端注入 deepseek 的 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，然后直接拉起 `claude`。你在 Claude Code 里什么也不用改。
 
 ## 3. 多开
 
@@ -58,7 +58,7 @@ $ ccr glm
 → launching claude with provider: glm
 ```
 
-三个终端、三个后端，各自独立，互不干扰。这就是 ccr 的核心用法。
+三个终端、三个后端，各自独立，互不干扰。这就是 CC RUN 的核心用法。
 
 ## 透传 Claude Code 参数
 

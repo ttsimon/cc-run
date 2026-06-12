@@ -1,12 +1,12 @@
 # 配置与按名解析
 
-ccr 的配置来自两个来源，合并为一个列表。
+CC RUN 的配置来自两个来源，合并为一个列表。
 
 ## 两个配置来源
 
 ### 1. cc-switch 数据库（只读）
 
-`~/.cc-switch/cc-switch.db` —— cc-switch 管理的 SQLite 库。ccr **只读**，不写不改。其中 `app_type=claude` 的所有 provider 会被自动读入。
+`~/.cc-switch/cc-switch.db` —— cc-switch 管理的 SQLite 库。CC RUN **只读**，不写不改。其中 `app_type=claude` 的所有 provider 会被自动读入。
 
 ### 2. 自定义目录
 
