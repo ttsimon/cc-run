@@ -37,6 +37,7 @@ internal/doctor/    后端可达性体检（ccr doctor）
 internal/chain/     多后端流水线：yaml 解析/模板/段执行/编排/放行/审查判定/黑名单钩子/worktree
 internal/cli/       参数分发 ls/show/edit/alias/unalias/default/completion/-/./<name>/交互
 internal/tui/       huh fuzzy 选择器
+internal/ui/        共享终端样式层（lipgloss 调色板/符号 + TTY 降级）
 tools/commitlint/   commit-msg 校验（被 lefthook 调用）
 docs/superpowers/   设计 spec 与实现计划
 ```

@@ -28,8 +28,11 @@ type Event struct {
 
 // rawEvent 对应 claude -p --output-format stream-json --verbose 的一行。
 //
-// ⚠️ 集成边界：字段名按当前 Claude Code stream-json 写。实现时跑一次真
-// `claude -p --output-format stream-json --verbose` 校准；schema 漂移只改本文件。
+// ⚠️ 集成边界：字段名按 Claude Code stream-json 写；schema 漂移只改本文件。
+// 已对 claude 2.1.161 校准（2026-06-12）：result.result / usage.input_tokens /
+// usage.output_tokens / assistant.message.content[].{type,text,name,input} 字段名
+// 均一致。注：thinking block 的内容在 stream-json 中为空（仅留 signature），故
+// verbose 的 EventAssistantText 实取 text 叙述块而非思考文本。
 type rawEvent struct {
 	Type    string `json:"type"`
 	Result  string `json:"result"`
