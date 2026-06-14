@@ -170,3 +170,19 @@ func (f *fsTracker) scan() (map[string]fileSig, error) {
 	})
 	return out, err
 }
+
+// RelevantFilesNote 生成追加到后续段 prompt 末尾的范围提示；空集返回空串。
+// 这是软提示（不是硬围栏）：引导 agent 聚焦本链已改文件，物理边界由 guard 兜底。
+func RelevantFilesNote(files []string) string {
+	if len(files) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n\n---\n[本次链已改动以下文件，请聚焦这些文件，不要读取无关或外部路径]\n")
+	for _, f := range files {
+		b.WriteString("- ")
+		b.WriteString(f)
+		b.WriteString("\n")
+	}
+	return b.String()
+}

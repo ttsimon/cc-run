@@ -3,6 +3,7 @@ package chain
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -141,4 +142,23 @@ func equalStrs(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func TestRelevantFilesNote_空集返回空串(t *testing.T) {
+	if RelevantFilesNote(nil) != "" {
+		t.Error("空集应返回空串")
+	}
+	if RelevantFilesNote([]string{}) != "" {
+		t.Error("空 slice 应返回空串")
+	}
+}
+
+func TestRelevantFilesNote_含全部文件名(t *testing.T) {
+	note := RelevantFilesNote([]string{"a.go", "b/c.go"})
+	if !strings.Contains(note, "a.go") || !strings.Contains(note, "b/c.go") {
+		t.Errorf("提示应含全部文件名: %q", note)
+	}
+	if !strings.Contains(note, "聚焦") {
+		t.Errorf("提示应含聚焦引导语: %q", note)
+	}
 }
