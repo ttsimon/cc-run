@@ -518,6 +518,61 @@ func TestOrchestrate_settings在工作目录外(t *testing.T) {
 	}
 }
 
+func TestOrchestrate_注入相关文件集到后续段(t *testing.T) {
+	dir := t.TempDir() // 非 git → fsTracker
+	c := Chain{
+		Workdir: dir,
+		Segments: []Segment{
+			{Name: "plan", Profile: "strong", Prompt: "规划"},
+			{Name: "impl", Profile: "strong", Prompt: "实现"},
+			{Name: "review", Profile: "cheap", Prompt: "审查"},
+		},
+	}
+	var seenPrompts []string
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		seenPrompts = append(seenPrompts, spec.Prompt)
+		if seg.Name == "impl" {
+			_ = os.WriteFile(filepath.Join(dir, "foo.go"), []byte("x"), 0o644)
+			_ = os.WriteFile(filepath.Join(dir, "bar.go"), []byte("y"), 0o644)
+		}
+		return seg.Name + "-out", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(seenPrompts[0], "本次链已改动") {
+		t.Errorf("首段不应有文件清单: %q", seenPrompts[0])
+	}
+	if !strings.Contains(seenPrompts[2], "foo.go") || !strings.Contains(seenPrompts[2], "bar.go") {
+		t.Errorf("review 段应含相关文件清单: %q", seenPrompts[2])
+	}
+}
+
+func TestOrchestrate_tracker出错不打断链(t *testing.T) {
+	c := Chain{
+		Workdir: t.TempDir(),
+		Segments: []Segment{
+			{Name: "a", Profile: "strong", Prompt: "x"},
+			{Name: "b", Profile: "strong", Prompt: "y"},
+		},
+	}
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	ran := 0
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		ran++
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if ran != 2 {
+		t.Errorf("两段都应跑完, ran=%d", ran)
+	}
+}
+
 func TestOrchestrate_放行点展示判定(t *testing.T) {
 	dir := t.TempDir()
 	_ = os.MkdirAll(filepath.Join(dir, ".ccr-chain"), 0o755)

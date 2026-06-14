@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -81,6 +82,12 @@ func (o *Orchestrator) Run(c Chain) error {
 		settingsRoot = ""
 	}
 
+	// 任务边界（第 3 层）：追踪本链改动文件集，注入后续段 prompt 作软提示。
+	// best-effort——失败则后续不注入，绝不打断链（与 segmentDiffStat 同语义）。
+	tracker := newChangeTracker(workdir)
+	_ = tracker.Baseline()
+	relevant := map[string]bool{} // 链级只增总集
+
 	// 据「最后一次审查」的判定决定收尾，不是「任一段曾 needs-work」——否则早段
 	// needs-work + 修复段 + 末段 pass 的链会被早段粘死、误走 Abandon 丢掉成果。
 	lastReviewNeedsWork := false
@@ -93,9 +100,18 @@ func (o *Orchestrator) Run(c Chain) error {
 			abandon(out, iso)
 			return fmt.Errorf("段 #%d(%q) 的 profile 解析失败: %w", i, seg.Name, err)
 		}
+		// 累加上一段（已 SealSegment）的改动到链级总集，并集防"建了又删"反复。
+		if files, err := tracker.ChangedFiles(); err == nil {
+			for _, f := range files {
+				relevant[f] = true
+			}
+		}
 		renderedPrompt := Render(seg.Prompt, prev, o.Input)
 		if seg.Review {
 			renderedPrompt += ReviewInstruction()
+		}
+		if note := RelevantFilesNote(sortedKeys(relevant)); note != "" {
+			renderedPrompt += note
 		}
 		// 安全：合并黑名单经 env 传给 guard；每段生成一个带 PreToolUse 钩子的 settings。
 		env := map[string]string{}
@@ -243,4 +259,14 @@ func abandon(out io.Writer, iso Isolator) {
 	}
 	loc, _ := iso.Abandon()
 	fmt.Fprintf(out, "成果保留在 %s（未合入）\n", loc)
+}
+
+// sortedKeys 返回 map 的键，已排序——给 RelevantFilesNote 稳定输出。
+func sortedKeys(m map[string]bool) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
