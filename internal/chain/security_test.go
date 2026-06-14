@@ -59,3 +59,110 @@ func TestCommandFromHookInput(t *testing.T) {
 		t.Error("坏 JSON 应返回空串")
 	}
 }
+
+func TestParseHookInput_汇总路径字段(t *testing.T) {
+	info := ParseHookInput([]byte(`{"tool_name":"Read","tool_input":{"file_path":"/etc/passwd"}}`))
+	if info.ToolName != "Read" || len(info.Paths) != 1 || info.Paths[0] != "/etc/passwd" {
+		t.Errorf("Read 应抽出 file_path: %+v", info)
+	}
+	info = ParseHookInput([]byte(`{"tool_name":"Glob","tool_input":{"path":"/foo","pattern":"**/*.go"}}`))
+	if len(info.Paths) != 2 {
+		t.Errorf("Glob 应抽 path+pattern 两路径: %+v", info)
+	}
+	info = ParseHookInput([]byte(`{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"/x.ipynb"}}`))
+	if len(info.Paths) != 1 || info.Paths[0] != "/x.ipynb" {
+		t.Errorf("NotebookEdit 应抽 notebook_path: %+v", info)
+	}
+	info = ParseHookInput([]byte(`{"tool_name":"WebFetch","tool_input":{"url":"https://x"}}`))
+	if len(info.Paths) != 0 {
+		t.Errorf("WebFetch 不应被路径围栏关心: %+v", info)
+	}
+	info = ParseHookInput([]byte(`bad json`))
+	if info.ToolName != "" || len(info.Paths) != 0 {
+		t.Errorf("坏 JSON 应零值: %+v", info)
+	}
+}
+
+func TestPathEscapes_workdir内放行(t *testing.T) {
+	wd := "/work"
+	if PathEscapes("/work/sub/x.txt", wd, nil) {
+		t.Error("workdir 子文件应放行")
+	}
+	if PathEscapes("sub/x.txt", wd, nil) {
+		t.Error("相对路径应基于 workdir 解析后放行")
+	}
+	if PathEscapes("/work", wd, nil) {
+		t.Error("workdir 自身应放行")
+	}
+}
+
+func TestPathEscapes_workdir外拦截(t *testing.T) {
+	wd := "/work"
+	if !PathEscapes("/etc/passwd", wd, nil) {
+		t.Error("绝对路径越界应拦")
+	}
+	if !PathEscapes("../sibling/x", wd, nil) {
+		t.Error("../ 跳出应拦")
+	}
+	if !PathEscapes("/workother/x", wd, nil) {
+		t.Error("前缀相同但不是子目录（/workother）应拦，不能误匹 /work")
+	}
+}
+
+func TestPathEscapes_白名单逃生口(t *testing.T) {
+	wd := "/work"
+	allowed := []string{"/tmp", "/var/cache"}
+	if PathEscapes("/tmp/x.sh", wd, allowed) {
+		t.Error("白名单内应放行")
+	}
+	if PathEscapes("/var/cache/foo", wd, allowed) {
+		t.Error("白名单子路径应放行")
+	}
+	if !PathEscapes("/etc/x", wd, allowed) {
+		t.Error("不在白名单仍应拦")
+	}
+}
+
+func TestPathEscapes_空入参不阻断(t *testing.T) {
+	if PathEscapes("", "/work", nil) {
+		t.Error("空 path 应放行")
+	}
+	if PathEscapes("/x", "", nil) {
+		t.Error("空 workdir（非 chain 上下文）应放行，向下兼容")
+	}
+}
+
+func TestBashEscapesWorkdir_明显上跳(t *testing.T) {
+	cases := []string{
+		"cd ..",
+		"cd ../foo",
+		"cd /etc",
+		"cd ~",
+		"cd $HOME && ls",
+		"ls && cd /tmp",
+		"foo; cd ..",
+		"a | cd /usr",
+		"CD ..", // 大小写不敏感（PowerShell）
+	}
+	for _, c := range cases {
+		if !BashEscapesWorkdir(c) {
+			t.Errorf("应拦：%q", c)
+		}
+	}
+}
+
+func TestBashEscapesWorkdir_合法不误伤(t *testing.T) {
+	cases := []string{
+		"cd subdir",
+		"cd ./subdir",
+		"cd subdir/foo",
+		"echo hello",
+		"",
+		"grep -r 'foo' .",
+	}
+	for _, c := range cases {
+		if BashEscapesWorkdir(c) {
+			t.Errorf("不应拦：%q", c)
+		}
+	}
+}

@@ -23,6 +23,7 @@ type Segment struct {
 	Prompt       string   `yaml:"prompt"`        // 可含 {{prev.output}}
 	AllowTools   []string `yaml:"allow_tools"`   // claude --allowedTools
 	DenyCommands []string `yaml:"deny_commands"` // 追加到内置命令黑名单
+	AllowPaths   []string `yaml:"allow_paths"`   // 路径围栏白名单逃生口（如 ["/tmp"]），默认仅 workdir
 	Review       bool     `yaml:"review"`        // 该段产出 findings + 判定
 	Optional     bool     `yaml:"optional"`      // 仅在放行点用户选择时才跑（如修复段）
 }

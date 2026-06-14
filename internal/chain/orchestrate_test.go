@@ -399,6 +399,48 @@ func TestOrchestrate_段带settings与黑名单env(t *testing.T) {
 	}
 }
 
+// 路径围栏：每段 spec.Env 必须给 guard 提供 workdir 与 GIT_CEILING_DIRECTORIES，
+// 且 workdir 是绝对路径——guard 用它做 PathEscapes 基准；GIT_CEILING_DIRECTORIES
+// 防 agent 跑 git 时被父仓库牵连。
+func TestOrchestrate_注入workdir围栏env(t *testing.T) {
+	dir := t.TempDir()
+	c := Chain{Workdir: dir, Segments: []Segment{
+		{Name: "a", Profile: "strong", Prompt: "x", AllowPaths: []string{"/tmp"}},
+	}}
+	var seen runSpec
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { seen = spec; return "o", 0, nil }
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(seen.Env["CCR_CHAIN_WORKDIR"]) {
+		t.Errorf("CCR_CHAIN_WORKDIR 应为绝对路径, got %q", seen.Env["CCR_CHAIN_WORKDIR"])
+	}
+	// GIT_CEILING_DIRECTORIES 必须是 workdir 的父目录——git "ceiling" 语义是"不能进入"，
+	// 要拦上爬就把父级列为禁区。
+	if got, want := seen.Env["GIT_CEILING_DIRECTORIES"], filepath.Dir(seen.Env["CCR_CHAIN_WORKDIR"]); got != want {
+		t.Errorf("GIT_CEILING_DIRECTORIES 应为 workdir 的父目录: got %q want %q", got, want)
+	}
+	if !strings.Contains(seen.Env["CCR_CHAIN_ALLOW_PATHS"], "/tmp") {
+		t.Errorf("AllowPaths 应经 env 传给 guard, got %q", seen.Env["CCR_CHAIN_ALLOW_PATHS"])
+	}
+}
+
+// 回归：非 git 目录在父级是 git 仓库时，gitIn 不应爬到父级——这正是 chain 在 temp/
+// 跑出父仓库 diff 的根因。GIT_CEILING_DIRECTORIES=dir 强制锁住。
+func TestGitIn_非git子目录不爬父仓库(t *testing.T) {
+	repo := initRepo(t)
+	sub := filepath.Join(repo, "non-git-child")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err := gitIn(sub, "rev-parse", "--is-inside-work-tree")
+	if err == nil && strings.TrimSpace(string(out)) == "true" {
+		t.Errorf("非 git 子目录不应被父仓库牵连, got %q", out)
+	}
+}
+
 func TestOrchestrate_放行点加厚含耗时(t *testing.T) {
 	c := Chain{Workdir: t.TempDir(), Segments: []Segment{
 		{Name: "a", Profile: "strong", Prompt: "x"},

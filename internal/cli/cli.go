@@ -557,16 +557,57 @@ func runChain(cfg config.Config, args []string, out io.Writer) int {
 	return 0
 }
 
-// runChainGuard: PreToolUse 钩子调用；命中黑名单（CCR_CHAIN_DENY 换行分隔）则退 2 阻止。
+// runChainGuard: PreToolUse 钩子调用，三道闸：
+//  1. 命令黑名单（CCR_CHAIN_DENY 换行分隔）
+//  2. Bash cd 上跳（cd .. / cd / / cd ~）
+//  3. 路径围栏（Read/Edit/Write/Glob/Grep/NotebookEdit/NotebookRead 等的 file_path/path/
+//     pattern/notebook_path 必须落在 CCR_CHAIN_WORKDIR 或 CCR_CHAIN_ALLOW_PATHS 内）
+//
+// 任一命中 → 退 2 阻止该工具调用。CCR_CHAIN_WORKDIR 为空时（非 chain 上下文，或老版本）
+// 不做围栏，向下兼容。
 func runChainGuard(in io.Reader, errOut io.Writer) int {
 	raw, _ := io.ReadAll(in)
-	cmd := chain.CommandFromHookInput(raw)
-	denylist := strings.Split(os.Getenv("CCR_CHAIN_DENY"), "\n")
-	if chain.Denied(cmd, denylist) {
-		fmt.Fprintf(errOut, "ccr: 命令命中红线黑名单，已拦截：%s\n", cmd)
-		return 2
+	info := chain.ParseHookInput(raw)
+
+	denylist := splitNonEmpty(os.Getenv("CCR_CHAIN_DENY"), "\n")
+	workdir := os.Getenv("CCR_CHAIN_WORKDIR")
+	allowPaths := splitNonEmpty(os.Getenv("CCR_CHAIN_ALLOW_PATHS"), "\n")
+
+	if info.Command != "" {
+		if chain.Denied(info.Command, denylist) {
+			fmt.Fprintf(errOut, "ccr: 命令命中红线黑名单，已拦截：%s\n", info.Command)
+			return 2
+		}
+		if workdir != "" && chain.BashEscapesWorkdir(info.Command) {
+			fmt.Fprintf(errOut, "ccr: 命令试图跳出工作目录，已拦截：%s（限于 %s）\n", info.Command, workdir)
+			return 2
+		}
+	}
+
+	if workdir != "" {
+		for _, p := range info.Paths {
+			if chain.PathEscapes(p, workdir, allowPaths) {
+				fmt.Fprintf(errOut, "ccr: 路径越界已拦截：%s（限于 %s）\n", p, workdir)
+				return 2
+			}
+		}
 	}
 	return 0
+}
+
+// splitNonEmpty 按 sep 拆并丢空段；strings.Split("", sep) 会返回 [""]，影响下游判断。
+func splitNonEmpty(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, sep)
+	out := parts[:0]
+	for _, p := range parts {
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // printUsage 打印帮助。

@@ -103,6 +103,22 @@ func (o *Orchestrator) Run(c Chain) error {
 			env[k] = v
 		}
 		env["CCR_CHAIN_DENY"] = strings.Join(MergeDenylist(DefaultDenylist(), seg.DenyCommands), "\n")
+		// 路径围栏：把 workdir 与白名单经 env 传给 guard，guard 拦绝对路径越界 / cd 上跳。
+		// GIT_CEILING_DIRECTORIES 同时限 agent 自己跑的 git——非 git 目录不会被父仓库
+		// 牵连（agent 在 temp/ 跑 git status 不会爬到父项目）。ceiling 是 workdir 的
+		// **父目录**——git 文档语义是"不能进入这些目录"，要拦上爬就把父级列为禁区。
+		// canonPath 解析软链：macOS 的 /var/folders 实为 /private/var/folders，
+		// git 内部 realpath 后跟字面路径比对，不解析则 ceiling 与 PathEscapes 都失效。
+		if canon := canonPath(workdir); canon != "" {
+			env["CCR_CHAIN_WORKDIR"] = canon
+			parent := filepath.Dir(canon)
+			if parent != canon {
+				env["GIT_CEILING_DIRECTORIES"] = parent
+			}
+		}
+		if len(seg.AllowPaths) > 0 {
+			env["CCR_CHAIN_ALLOW_PATHS"] = strings.Join(seg.AllowPaths, "\n")
+		}
 
 		settingsPath := ""
 		if settingsRoot != "" {
@@ -161,8 +177,12 @@ func (o *Orchestrator) Run(c Chain) error {
 					info += "\n[判定] needs-work —— 下一段建议放行修复"
 				}
 			}
-			if ds := segmentDiffStat(workdir); ds != "" {
-				info += "\n本段改动:\n" + ds
+			// 只有 worktree 模式才有"上一段提交"可 diff；copydir/无隔离调了无意义，
+			// 且非 git 目录调 git 会被 GIT_CEILING_DIRECTORIES 拦下，纯属噪音。
+			if _, isWorktree := iso.(*worktreeIsolator); isWorktree {
+				if ds := segmentDiffStat(workdir); ds != "" {
+					info += "\n本段改动:\n" + ds
+				}
 			}
 			info += fmt.Sprintf("\n耗时 %s", elapsed)
 			next := c.Segments[i+1]

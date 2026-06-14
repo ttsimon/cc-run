@@ -116,6 +116,8 @@ func TestRunChain_文件不存在报错(t *testing.T) {
 
 func TestRunChainGuard_命中退2(t *testing.T) {
 	t.Setenv("CCR_CHAIN_DENY", "rm -rf\ngit push")
+	t.Setenv("CCR_CHAIN_WORKDIR", "")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
 	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}`)
 	var errBuf bytes.Buffer
 	if code := runChainGuard(in, &errBuf); code != 2 {
@@ -125,10 +127,82 @@ func TestRunChainGuard_命中退2(t *testing.T) {
 
 func TestRunChainGuard_未命中退0(t *testing.T) {
 	t.Setenv("CCR_CHAIN_DENY", "rm -rf")
+	t.Setenv("CCR_CHAIN_WORKDIR", "")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
 	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"ls -la"}}`)
 	var errBuf bytes.Buffer
 	if code := runChainGuard(in, &errBuf); code != 0 {
 		t.Errorf("未命中应退 0, got %d", code)
+	}
+}
+
+func TestRunChainGuard_路径越界拦截(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Read","tool_input":{"file_path":"/etc/passwd"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 2 {
+		t.Errorf("Read 越界应退 2, got %d", code)
+	}
+	if !strings.Contains(errBuf.String(), "越界") {
+		t.Errorf("应有越界提示, stderr=%q", errBuf.String())
+	}
+}
+
+func TestRunChainGuard_路径在workdir放行(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Write","tool_input":{"file_path":"/work/sub/x.txt"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 0 {
+		t.Errorf("workdir 内应放行, got %d", code)
+	}
+}
+
+func TestRunChainGuard_白名单逃生口生效(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "/tmp\n/var/cache")
+	in := strings.NewReader(`{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.sh"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 0 {
+		t.Errorf("白名单内应放行, got %d, stderr=%q", code, errBuf.String())
+	}
+}
+
+func TestRunChainGuard_Bash上跳拦截(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"cd .. && ls"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 2 {
+		t.Errorf("cd .. 应退 2, got %d", code)
+	}
+}
+
+func TestRunChainGuard_无workdir不做围栏(t *testing.T) {
+	// 向下兼容：CCR_CHAIN_WORKDIR 为空时不阻断 Read/Write 等工具调用。
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Read","tool_input":{"file_path":"/etc/passwd"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 0 {
+		t.Errorf("无 workdir 时不应做路径围栏, got %d", code)
+	}
+}
+
+func TestRunChainGuard_Glob模式越界(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Glob","tool_input":{"pattern":"/Users/foo/**"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 2 {
+		t.Errorf("Glob 绝对越界 pattern 应退 2, got %d", code)
 	}
 }
 

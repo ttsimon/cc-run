@@ -40,10 +40,55 @@ func isInsideWorkTree(dir string) bool {
 	return strings.TrimSpace(string(out)) == "true"
 }
 
+// gitIn 在 dir 跑 git，并用 GIT_CEILING_DIRECTORIES 把 git 锁死在 dir 内：
+// 非 git 目录不会被父仓库的 .git 牵连（fix: chain 在父级是 git 的非 git 目录里
+// segmentDiffStat / isInsideWorkTree 误指父仓库），worktreeIsolator 也被强制要求
+// w.repo 自己就是 git 工作树根（不是的话 worktree add 会失败而非悄悄爬到根）。
+//
+// ceiling 必须是 dir 的**父目录**：git 文档语义是"不能进入这些目录"——把 dir 的
+// 父级列为禁区，git 从 dir 向上找 .git 时进不了 parent 就停。EvalSymlinks 必须做：
+// macOS 上 /var/folders/... 是 /private/var/folders/... 的软链，git 内部 realpath
+// 当前路径后跟字面 ceiling 比对，不解析就匹不上、ceiling 失效。
 func gitIn(dir string, args ...string) ([]byte, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	canon := canonPath(dir)
+	if canon != "" {
+		parent := filepath.Dir(canon)
+		// 已到根（filepath.Dir("/") == "/"）就不设 ceiling——本来就没父级可禁。
+		if parent != canon {
+			cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+parent)
+		}
+	}
 	return cmd.CombinedOutput()
+}
+
+// canonPath 转绝对 + 解析软链；路径不存在时**递归**向上找最深的存在祖先解析，剩余
+// 部分原样拼回。这样 /var/cache/foo（中间 /var/cache 不存在但 /var 是软链）也能正确
+// 解到 /private/var/cache/foo——否则 PathEscapes 会把同一物理路径的两种形式当成两条。
+//
+// 用例驱动：PathEscapes 要比的常是 Write 还没创建的新文件 / 系统未建的子目录。
+func canonPath(p string) string {
+	if p == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	return canonWalk(abs)
+}
+
+// canonWalk 在已绝对化的路径上爬：能 EvalSymlinks 整段就用整段，否则切掉 base 递归。
+func canonWalk(abs string) string {
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		return real
+	}
+	parent := filepath.Dir(abs)
+	if parent == abs {
+		return abs // 到根（或自指），无法再往上
+	}
+	return filepath.Join(canonWalk(parent), filepath.Base(abs))
 }
 
 // sanitize 把 name 里的非字母数字换成 '-'，空名回退 "chain"。用于临时分支名。

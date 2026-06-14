@@ -75,3 +75,24 @@ func TestUsesInput_不含返回false(t *testing.T) {
 		t.Error("不含 {{input}} 应返回 false")
 	}
 }
+
+func TestParse_AllowPaths字段(t *testing.T) {
+	src := `
+name: x
+segments:
+  - name: a
+    profile: p
+    prompt: hi
+    allow_paths:
+      - /tmp
+      - /var/cache
+`
+	c, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := c.Segments[0].AllowPaths
+	if len(got) != 2 || got[0] != "/tmp" || got[1] != "/var/cache" {
+		t.Errorf("allow_paths 解析不对: %v", got)
+	}
+}

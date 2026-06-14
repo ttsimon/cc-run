@@ -18,5 +18,7 @@ segments:
     profile: 改成另一家profile名
     prompt: |
       审查本次改动是否符合计划、有无明显 bug。
+      只看当前工作目录（含子目录）的内容，不要读取外部路径或父级仓库的源码——
+      你要审的是这条链刚刚产出的成果，不是 ccr 工具本身。
     review: true
     allow_tools: [Read, Bash]
