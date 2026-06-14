@@ -2,6 +2,8 @@ package chain
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -111,5 +113,60 @@ type fileSig struct {
 	mtime int64
 }
 
-func (f *fsTracker) Baseline() error                 { return nil }
-func (f *fsTracker) ChangedFiles() ([]string, error) { return nil, nil }
+func (f *fsTracker) Baseline() error {
+	snap, err := f.scan()
+	if err != nil {
+		return err
+	}
+	f.snapshot = snap
+	return nil
+}
+
+func (f *fsTracker) ChangedFiles() ([]string, error) {
+	cur, err := f.scan()
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for rel, sig := range cur {
+		old, ok := f.snapshot[rel]
+		if !ok || old != sig {
+			files = append(files, rel)
+		}
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+func (f *fsTracker) scan() (map[string]fileSig, error) {
+	out := map[string]fileSig{}
+	err := filepath.WalkDir(f.workdir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(f.workdir, p)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		top := strings.SplitN(filepath.ToSlash(rel), "/", 2)[0]
+		if top == ".git" || top == ".ccr-chain" {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		out[filepath.ToSlash(rel)] = fileSig{size: info.Size(), mtime: info.ModTime().UnixNano()}
+		return nil
+	})
+	return out, err
+}

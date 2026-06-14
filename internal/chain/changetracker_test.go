@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestNewChangeTracker_git目录选gitTracker(t *testing.T) {
@@ -87,6 +88,44 @@ func TestGitTracker_已提交改动仍计入(t *testing.T) {
 	}
 	if !equalStrs(got, []string{"sealed.txt"}) {
 		t.Errorf("diff baseSHA 应覆盖已提交改动, got %v", got)
+	}
+}
+
+func TestFsTracker_捕获新增与修改(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "exist.txt", "原始")
+	f := &fsTracker{workdir: dir}
+	if err := f.Baseline(); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, "new.txt", "新文件")
+	writeFile(t, dir, "exist.txt", "改了而且更长")
+	future := time.Now().Add(2 * time.Second)
+	_ = os.Chtimes(filepath.Join(dir, "exist.txt"), future, future)
+	got, err := f.ChangedFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !equalStrs(got, []string{"exist.txt", "new.txt"}) {
+		t.Errorf("ChangedFiles = %v, want [exist.txt new.txt]", got)
+	}
+}
+
+func TestFsTracker_跳过git与ccrchain(t *testing.T) {
+	dir := t.TempDir()
+	f := &fsTracker{workdir: dir}
+	if err := f.Baseline(); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, ".git/config", "应忽略")
+	writeFile(t, dir, ".ccr-chain/verdict", "pass")
+	writeFile(t, dir, "real.txt", "应计入")
+	got, err := f.ChangedFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !equalStrs(got, []string{"real.txt"}) {
+		t.Errorf("应只含 real.txt, got %v", got)
 	}
 }
 
