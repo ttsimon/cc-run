@@ -596,3 +596,41 @@ func TestOrchestrate_放行点展示判定(t *testing.T) {
 		t.Errorf("放行点应展示判定: %q", cp.got)
 	}
 }
+
+func TestOrchestrate_回归_非git子目录不含父仓库文件(t *testing.T) {
+	repo := initRepo(t) // 父级是 git，含已提交 f.txt
+	sub := filepath.Join(repo, "temp")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	c := Chain{
+		Workdir: sub, // 非 git 子目录
+		Segments: []Segment{
+			{Name: "impl", Profile: "strong", Prompt: "实现"},
+			{Name: "review", Profile: "cheap", Prompt: "审查"},
+		},
+	}
+	var reviewPrompt string
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		if seg.Name == "impl" {
+			_ = os.WriteFile(filepath.Join(sub, "result.txt"), []byte("成果"), 0o644)
+		}
+		if seg.Name == "review" {
+			reviewPrompt = spec.Prompt
+		}
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	// review 段应看到子目录里的 result.txt
+	if !strings.Contains(reviewPrompt, "result.txt") {
+		t.Errorf("review 应含子目录成果 result.txt: %q", reviewPrompt)
+	}
+	// 但绝不能含父仓库的 f.txt
+	if strings.Contains(reviewPrompt, "f.txt") {
+		t.Errorf("review 不应含父仓库文件 f.txt: %q", reviewPrompt)
+	}
+}
