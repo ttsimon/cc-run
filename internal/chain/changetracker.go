@@ -1,5 +1,11 @@
 package chain
 
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
 // ChangeTracker 追踪一条链从开始到当前在 workdir 内改动了哪些文件。
 // 与 Isolator 的 git/非 git 判定同源，但独立：isolate=false 就地执行时没有
 // Isolator，仍需追踪范围。
@@ -25,8 +31,74 @@ type gitTracker struct {
 	baseDirty map[string]bool
 }
 
-func (g *gitTracker) Baseline() error                 { return nil }
-func (g *gitTracker) ChangedFiles() ([]string, error) { return nil, nil }
+func (g *gitTracker) Baseline() error {
+	out, err := gitIn(g.workdir, "rev-parse", "HEAD")
+	if err != nil {
+		return fmt.Errorf("读 baseSHA 失败: %v %s", err, out)
+	}
+	g.baseSHA = strings.TrimSpace(string(out))
+	g.baseDirty = map[string]bool{}
+	for _, f := range g.statusFiles() {
+		g.baseDirty[f] = true
+	}
+	return nil
+}
+
+func (g *gitTracker) ChangedFiles() ([]string, error) {
+	set := map[string]bool{}
+	if out, err := gitIn(g.workdir, "diff", "--name-only", g.baseSHA); err == nil {
+		for _, f := range splitLines(string(out)) {
+			set[f] = true
+		}
+	}
+	if out, err := gitIn(g.workdir, "ls-files", "--others", "--exclude-standard"); err == nil {
+		for _, f := range splitLines(string(out)) {
+			set[f] = true
+		}
+	}
+	var files []string
+	for f := range set {
+		if !g.baseDirty[f] {
+			files = append(files, f)
+		}
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+// statusFiles 返回 git status --porcelain 列出的文件名（含 untracked）。
+func (g *gitTracker) statusFiles() []string {
+	out, err := gitIn(g.workdir, "status", "--porcelain")
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, line := range splitLines(string(out)) {
+		s := strings.TrimSpace(line)
+		if s == "" {
+			continue
+		}
+		if len(line) > 3 {
+			s = strings.TrimSpace(line[3:])
+		}
+		if idx := strings.Index(s, " -> "); idx >= 0 {
+			s = s[idx+len(" -> "):]
+		}
+		files = append(files, s)
+	}
+	return files
+}
+
+// splitLines 按行切并丢空行（git --name-only 等输出尾随空行）。
+func splitLines(s string) []string {
+	var out []string
+	for _, line := range strings.Split(s, "\n") {
+		if t := strings.TrimSpace(line); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
 
 // fsTracker 用 size+mtime 快照追踪改动（非 git 目录）。
 type fsTracker struct {
