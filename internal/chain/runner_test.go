@@ -3,7 +3,6 @@ package chain
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -53,10 +52,6 @@ func TestRunSegment_在Workdir里运行(t *testing.T) {
 	// isolate 隔离的关键：子进程 cwd 必须是 spec.Workdir（worktree），
 	// 否则相对路径文件会落到调用者真实仓库里。
 	dir := t.TempDir()
-	want, err := filepath.EvalSymlinks(dir) // macOS 下 TempDir 可能含符号链接
-	if err != nil {
-		want = dir
-	}
 
 	r := NewRunner()
 	r.ClaudePath = os.Args[0]
@@ -75,8 +70,20 @@ func TestRunSegment_在Workdir里运行(t *testing.T) {
 	if code != 0 {
 		t.Errorf("退出码 %d", code)
 	}
-	if !strings.Contains(out, "CWD="+want) {
-		t.Errorf("子进程应在 Workdir(%q) 运行，实际输出: %q", want, out)
+	// 从输出抠出子进程报告的 cwd，按**文件身份**（os.SameFile）比对，不比路径字符串：
+	// 路径拼写在不同平台会"同目录不同写法"——macOS 的 /var→/private 符号链接、Windows 的
+	// 8.3 短名（GitHub runner 上 TempDir 是 C:\Users\RUNNER~1\...，子进程 Getwd 报短名而
+	// dir 展开后是长名 runneradmin）。SameFile 比的是 inode/文件 ID，这些差异一律不影响。
+	gotCWD := ""
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "CWD=") {
+			gotCWD = strings.TrimPrefix(line, "CWD=")
+		}
+	}
+	gotInfo, gerr := os.Stat(gotCWD)
+	wantInfo, werr := os.Stat(dir)
+	if gerr != nil || werr != nil || !os.SameFile(gotInfo, wantInfo) {
+		t.Errorf("子进程应在 Workdir(%q) 运行，实际输出: %q", dir, out)
 	}
 }
 
