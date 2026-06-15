@@ -82,6 +82,19 @@ func (o *Orchestrator) Run(c Chain) error {
 		settingsRoot = ""
 	}
 
+	// 干净屋：给每段一个空的 CLAUDE_CONFIG_DIR，让无头 claude 不继承用户全局插件/技能/
+	// SessionStart 钩子（superpowers 等）——它们会注入大段前言、诱发段去调技能/起子代理，
+	// 行为不确定且费 token。注意 hooks 引擎本身没关，故下面 --settings 的 guard 钩子仍生效
+	// （已实测：CLAUDE_CONFIG_DIR 隔离下 plugin list 为空，但 echo 仍被黑名单拦）。
+	// 对比 `--bare`：那个会连我们自己的 guard 钩子一起 skip，废掉第 3 层防线，不能用。
+	// MkdirTemp 失败则退化为不注入（段继承全局配置，与旧 best-effort 行为一致）。
+	cleanHome, homeErr := os.MkdirTemp("", "ccr-chain-home-")
+	if homeErr == nil {
+		defer func() { _ = os.RemoveAll(cleanHome) }()
+	} else {
+		cleanHome = ""
+	}
+
 	// 任务边界（第 3 层）：追踪本链改动文件集，注入后续段 prompt 作软提示。
 	// best-effort——失败则后续不注入，绝不打断链（与 segmentDiffStat 同语义）。
 	tracker := newChangeTracker(workdir)
@@ -90,7 +103,10 @@ func (o *Orchestrator) Run(c Chain) error {
 
 	// 据「最后一次审查」的判定决定收尾，不是「任一段曾 needs-work」——否则早段
 	// needs-work + 修复段 + 末段 pass 的链会被早段粘死、误走 Abandon 丢掉成果。
-	lastReviewNeedsWork := false
+	// fail-closed：只有最后一次审查明确 pass 才自动合入；needs-work 与"没产出判定"
+	// （漏写/拼错 verdict）都按未通过处理——质量闸在不确定时不能静默放行。
+	reviewRan := false
+	lastVerdict := VerdictUnknown
 	var prev string
 	for i := 0; i < len(c.Segments); i++ {
 		seg := c.Segments[i]
@@ -134,6 +150,9 @@ func (o *Orchestrator) Run(c Chain) error {
 		}
 		if len(seg.AllowPaths) > 0 {
 			env["CCR_CHAIN_ALLOW_PATHS"] = strings.Join(seg.AllowPaths, "\n")
+		}
+		if cleanHome != "" {
+			env["CLAUDE_CONFIG_DIR"] = cleanHome
 		}
 
 		settingsPath := ""
@@ -179,7 +198,8 @@ func (o *Orchestrator) Run(c Chain) error {
 			}
 		}
 		if seg.Review {
-			lastReviewNeedsWork = ReadVerdict(workdir) == VerdictNeedsWork
+			reviewRan = true
+			lastVerdict = ReadVerdict(workdir)
 		}
 
 		// 放行点（非 Auto，且后面还有段）
@@ -191,6 +211,8 @@ func (o *Orchestrator) Run(c Chain) error {
 					info += "\n[判定] pass ✓"
 				case VerdictNeedsWork:
 					info += "\n[判定] needs-work —— 下一段建议放行修复"
+				default:
+					info += "\n[判定] 未产出判定 —— 默认不自动合入，建议放行修复或检查审查段"
 				}
 			}
 			// 只有 worktree 模式才有"上一段提交"可 diff；copydir/无隔离调了无意义，
@@ -226,9 +248,13 @@ func (o *Orchestrator) Run(c Chain) error {
 	}
 
 	if iso != nil {
-		if lastReviewNeedsWork {
+		if reviewRan && lastVerdict != VerdictPass {
 			loc, _ := iso.Abandon()
-			fmt.Fprintf(out, "审查判定 needs-work，成果未自动合入，保留在 %s\n", loc)
+			if lastVerdict == VerdictNeedsWork {
+				fmt.Fprintf(out, "审查判定 needs-work，成果未自动合入，保留在 %s\n", loc)
+			} else {
+				fmt.Fprintf(out, "审查未产出明确判定（pass），成果未自动合入，保留在 %s\n", loc)
+			}
 		} else {
 			summary, err := iso.Integrate()
 			if err != nil {

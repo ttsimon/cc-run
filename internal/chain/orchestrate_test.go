@@ -597,6 +597,90 @@ func TestOrchestrate_放行点展示判定(t *testing.T) {
 	}
 }
 
+// 干净屋：每段必须注入一个独立、空的临时 CLAUDE_CONFIG_DIR，避免无头 claude 继承
+// 用户全局插件/技能/SessionStart 钩子（superpowers 等）——它们会注入大段前言、诱发
+// 段去调技能/起子代理，行为不确定且费 token。hooks 引擎本身没关，故 --settings 的
+// guard 钩子仍生效（已实测：echo 仍被黑名单拦）。必须落在工作目录之外。
+func TestOrchestrate_注入干净CLAUDE_CONFIG_DIR(t *testing.T) {
+	dir := t.TempDir()
+	c := Chain{Workdir: dir, Segments: []Segment{{Name: "a", Profile: "strong", Prompt: "x"}}}
+	var cfg string
+	var existedDuringRun bool
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		cfg = spec.Env["CLAUDE_CONFIG_DIR"]
+		// 必须在段执行时就存在（Run 结束会 defer 清理，故得在回调里查）
+		if info, err := os.Stat(cfg); err == nil && info.IsDir() {
+			existedDuringRun = true
+		}
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(cfg) {
+		t.Errorf("应注入绝对路径的 CLAUDE_CONFIG_DIR, got %q", cfg)
+	}
+	if !existedDuringRun {
+		t.Errorf("CLAUDE_CONFIG_DIR 段执行时应是已存在的目录: %q", cfg)
+	}
+	if strings.HasPrefix(cfg, dir) {
+		t.Errorf("CLAUDE_CONFIG_DIR 不应落在工作目录内: %q (workdir=%q)", cfg, dir)
+	}
+}
+
+// fail-closed：审查段没产出可识别判定（漏写/拼错 verdict，或被带跑没写）时，绝不能
+// 默认合入——质量闸在"不确定"时必须按未通过处理，而非静默放行。
+func TestOrchestrate_isolate_审查无判定不合回(t *testing.T) {
+	repo := initRepo(t)
+	c := Chain{
+		Name:    "t",
+		Isolate: true,
+		Workdir: repo,
+		Segments: []Segment{
+			{Name: "review", Profile: "strong", Prompt: "审", Review: true},
+		},
+	}
+	o := NewOrchestrator(testReg())
+	o.Auto = true
+	o.Out = &strings.Builder{}
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) {
+		_ = os.WriteFile(filepath.Join(spec.Workdir, "out.txt"), []byte("半成品"), 0o644)
+		// 故意不写 .ccr-chain/verdict —— 模拟 agent 漏写
+		return "o", 0, nil
+	}
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "out.txt")); !os.IsNotExist(err) {
+		t.Errorf("审查段未产出判定时不应把成果合回原仓库（fail-closed）")
+	}
+}
+
+// 放行点：审查段没产出判定时要明示（默认不合入），不能让用户以为"没消息=通过"。
+func TestOrchestrate_放行点提示无判定(t *testing.T) {
+	dir := t.TempDir() // 无 verdict 文件
+	c := Chain{
+		Workdir: dir,
+		Segments: []Segment{
+			{Name: "review", Profile: "strong", Prompt: "审", Review: true},
+			{Name: "fix", Profile: "cheap", Prompt: "改", Optional: true},
+		},
+	}
+	cp := &capturePauser{d: DecisionProceed}
+	o := NewOrchestrator(testReg())
+	o.Auto = false
+	o.Pauser = cp
+	o.runSegment = func(spec runSpec, seg Segment) (string, int, error) { return "o", 0, nil }
+	if err := o.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cp.got, "未产出判定") {
+		t.Errorf("放行点应提示审查未产出判定: %q", cp.got)
+	}
+}
+
 func TestOrchestrate_回归_非git子目录不含父仓库文件(t *testing.T) {
 	repo := initRepo(t) // 父级是 git，含已提交 f.txt
 	sub := filepath.Join(repo, "temp")
