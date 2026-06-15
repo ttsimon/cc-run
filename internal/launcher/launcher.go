@@ -32,14 +32,14 @@ func ComposeEnv(base []string, profileEnv map[string]string) []string {
 	return out
 }
 
-// ClaudeArgs 计算传给 claude 的参数。
-// 仅当存在顶层 model 且 env 未通过 ANTHROPIC_MODEL 指定模型时，追加 --model。
-func ClaudeArgs(model string, profileEnv map[string]string, extra []string) []string {
+// ClaudeArgs 计算传给 claude 的参数：--model（按需）+ profile 默认参数 + 用户 extra。
+func ClaudeArgs(model string, profileEnv map[string]string, profileArgs []string, extra []string) []string {
 	var args []string
 	_, envHasModel := profileEnv["ANTHROPIC_MODEL"]
 	if model != "" && !envHasModel {
 		args = append(args, "--model", model)
 	}
+	args = append(args, profileArgs...)
 	return append(args, extra...)
 }
 
@@ -76,7 +76,7 @@ func (l *Launcher) Run(p profile.Profile, extra []string) (int, error) {
 		path = found
 	}
 
-	cmd := exec.Command(path, ClaudeArgs(p.Model, p.Env, extra)...)
+	cmd := exec.Command(path, ClaudeArgs(p.Model, p.Env, p.Args, extra)...)
 	cmd.Env = ComposeEnv(l.Environ(), p.Env)
 	cmd.Stdin = l.Stdin
 	cmd.Stdout = l.Stdout

@@ -101,3 +101,204 @@ func TestRunAlias_坏目标报错(t *testing.T) {
 		t.Error("坏目标应非 0 退出")
 	}
 }
+
+func TestRunChain_缺文件参数报错(t *testing.T) {
+	if code := Execute([]string{"chain"}); code == 0 {
+		t.Error("chain 缺文件应非 0")
+	}
+}
+
+func TestRunChain_文件不存在报错(t *testing.T) {
+	if code := Execute([]string{"chain", "no-such-file.yaml"}); code == 0 {
+		t.Error("文件不存在应非 0")
+	}
+}
+
+func TestRunChainGuard_命中退2(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "rm -rf\ngit push")
+	t.Setenv("CCR_CHAIN_WORKDIR", "")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 2 {
+		t.Errorf("命中应退 2, got %d", code)
+	}
+}
+
+func TestRunChainGuard_未命中退0(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "rm -rf")
+	t.Setenv("CCR_CHAIN_WORKDIR", "")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"ls -la"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 0 {
+		t.Errorf("未命中应退 0, got %d", code)
+	}
+}
+
+func TestRunChainGuard_路径越界拦截(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Read","tool_input":{"file_path":"/etc/passwd"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 2 {
+		t.Errorf("Read 越界应退 2, got %d", code)
+	}
+	if !strings.Contains(errBuf.String(), "越界") {
+		t.Errorf("应有越界提示, stderr=%q", errBuf.String())
+	}
+}
+
+func TestRunChainGuard_路径在workdir放行(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Write","tool_input":{"file_path":"/work/sub/x.txt"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 0 {
+		t.Errorf("workdir 内应放行, got %d", code)
+	}
+}
+
+func TestRunChainGuard_白名单逃生口生效(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "/tmp\n/var/cache")
+	in := strings.NewReader(`{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.sh"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 0 {
+		t.Errorf("白名单内应放行, got %d, stderr=%q", code, errBuf.String())
+	}
+}
+
+func TestRunChainGuard_Bash上跳拦截(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"cd .. && ls"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 2 {
+		t.Errorf("cd .. 应退 2, got %d", code)
+	}
+}
+
+func TestRunChainGuard_无workdir不做围栏(t *testing.T) {
+	// 向下兼容：CCR_CHAIN_WORKDIR 为空时不阻断 Read/Write 等工具调用。
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Read","tool_input":{"file_path":"/etc/passwd"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 0 {
+		t.Errorf("无 workdir 时不应做路径围栏, got %d", code)
+	}
+}
+
+func TestRunChainGuard_Glob模式越界(t *testing.T) {
+	t.Setenv("CCR_CHAIN_DENY", "")
+	t.Setenv("CCR_CHAIN_WORKDIR", "/work")
+	t.Setenv("CCR_CHAIN_ALLOW_PATHS", "")
+	in := strings.NewReader(`{"tool_name":"Glob","tool_input":{"pattern":"/Users/foo/**"}}`)
+	var errBuf bytes.Buffer
+	if code := runChainGuard(in, &errBuf); code != 2 {
+		t.Errorf("Glob 绝对越界 pattern 应退 2, got %d", code)
+	}
+}
+
+func writeChainFile(t *testing.T, body string) string {
+	t.Helper()
+	dir := t.TempDir()
+	p := filepath.Join(dir, "c.chain.yaml")
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+const chainNoInput = "name: x\nsegments:\n  - name: a\n    profile: p\n    prompt: 做点事\n"
+const chainWithInput = "name: x\nsegments:\n  - name: a\n    profile: p\n    prompt: 做 {{input}}\n"
+
+// captureStderr 在 fn 执行期间把 os.Stderr 重定向到管道，返回捕获文本。
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+	fn()
+	_ = w.Close()
+	os.Stderr = orig
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
+}
+
+func TestRunChain_传input但链无占位报错(t *testing.T) {
+	f := writeChainFile(t, chainNoInput)
+	var code int
+	errOut := captureStderr(t, func() { code = Execute([]string{"chain", f, "--input", "加X"}) })
+	if code == 0 {
+		t.Error("传了 --input 但链无 {{input}} 应非 0")
+	}
+	if !strings.Contains(errOut, "需求会被忽略") {
+		t.Errorf("应因 input 无处可用而报错, stderr=%q", errOut)
+	}
+}
+
+func TestRunChain_链有占位但没传input报错(t *testing.T) {
+	f := writeChainFile(t, chainWithInput)
+	var code int
+	errOut := captureStderr(t, func() { code = Execute([]string{"chain", f}) })
+	if code == 0 {
+		t.Error("链含 {{input}} 但没传 --input 应非 0")
+	}
+	if !strings.Contains(errOut, "没传 --input") {
+		t.Errorf("应因缺 --input 而报错, stderr=%q", errOut)
+	}
+}
+
+func TestRunChain_i别名按input解析(t *testing.T) {
+	// -i 应把下一个参数当需求值消费；链无占位故触发"传了但没用"校验。
+	f := writeChainFile(t, chainNoInput)
+	var code int
+	errOut := captureStderr(t, func() { code = Execute([]string{"chain", f, "-i", "加X"}) })
+	if code == 0 || !strings.Contains(errOut, "需求会被忽略") {
+		t.Errorf("-i 应被当 input 旗标解析并触发校验, code=%d stderr=%q", code, errOut)
+	}
+}
+
+func TestRunChain_init生成模板(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir) // 切到临时目录，避免污染仓库
+	if code := Execute([]string{"chain", "init"}); code != 0 {
+		t.Fatalf("chain init 应成功, code=%d", code)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "plan-impl-review.chain.yaml")); err != nil {
+		t.Errorf("应生成模板文件: %v", err)
+	}
+}
+
+func TestRunChain_init未知模板报错(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if code := Execute([]string{"chain", "init", "nope"}); code == 0 {
+		t.Error("未知模板应非 0")
+	}
+}
+
+func TestRunChain_quiet和verbose互斥(t *testing.T) {
+	f := writeChainFile(t, chainNoInput)
+	var code int
+	errOut := captureStderr(t, func() { code = Execute([]string{"chain", f, "-q", "-v"}) })
+	if code == 0 {
+		t.Error("同时给 -q -v 应非 0")
+	}
+	if !strings.Contains(errOut, "-q") && !strings.Contains(errOut, "互斥") {
+		t.Errorf("应提示 -q/-v 互斥, stderr=%q", errOut)
+	}
+}

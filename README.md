@@ -54,6 +54,9 @@ go build -o ccr ./cmd/ccr     # Windows 下产物为 ccr.exe
 | `ccr default [<名字>]` | 无参查看默认；带参设置默认 |
 | `ccr completion <shell>` | 打印补全脚本（bash/zsh/powershell） |
 | `ccr completion install [shell] [--uninstall]` | 一键装/卸补全到当前 shell 配置 |
+| `ccr doctor [名字]` | 体检后端可达性（HTTP 探测 ANTHROPIC_BASE_URL，<500 算通；不带名=全部，有不通则退出码非 0） |
+| `ccr chain <file> [--auto]` | 跑一条多后端流水线（yaml 描述）；`--auto` 不停顿一路跑完 |
+| `ccr chain init [模板名]` | 从内置模板生成 `<模板名>.chain.yaml`（默认模板 plan-impl-review） |
 
 名字在两个来源中冲突时，用限定名消歧：`ccr cc-switch:DeepSeek` 或 `ccr custom:DeepSeek`。
 
@@ -86,6 +89,28 @@ ccr completion bash > /某处          # 或自取脚本手动放置
 ```
 
 补全里的配置名是动态的（脚本运行时调 `ccr __complete_names` 取当前列表）。
+
+## 多后端流水线（chain）
+
+把多个 provider 串成一条流水线：A 段跑完交给 B、B 给 C，每段可挂不同后端（如强模型规划 → 便宜模型实现 → 另一家审查）。
+
+```
+ccr chain init                 # 生成 plan-impl-review.chain.yaml
+# 改好里面三段的 profile 名（用 ccr ls 看可用名）
+ccr chain plan-impl-review.chain.yaml          # 默认每段间停下放行
+ccr chain plan-impl-review.chain.yaml --auto   # 一条道跑到黑，不停顿
+```
+
+**段间放行**：每段跑完停在 `⏸`，回车=放行下一段 / `s`=跳过 / `e`=改指令 / `q`=退出。停顿时可直接编辑工作目录里的产出文件再放行。
+
+**chain.yaml 字段**：
+
+- 顶层：`name`、`isolate`（true=在临时 git worktree 跑，可整体回滚）、`segments`。
+- 每段：`profile`（ccr 配置查询名）、`prompt`（可含 `{{prev.output}}` 注入上段输出）、`allow_tools`（claude 工具白名单）、`deny_commands`（追加到内置命令黑名单，命中即拦）、`review`（true=该段写判定到 `.ccr-chain/verdict`）、`optional`（可选段，非 --auto 时在放行点决定是否跑）。
+
+**安全**：worktree 隔离可回滚 + 每段工具白名单 + PreToolUse 钩子拦截命令黑名单 + 写操作圈在工作目录内。⚠️ Windows 真沙箱弱，主要靠 worktree 回滚 + 钩子黑名单兜底。
+
+**先体检**：`ccr doctor` 跑链前确认各后端可达。
 
 ## 配置来源
 

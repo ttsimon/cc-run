@@ -39,19 +39,26 @@ func TestComposeEnv_profile覆盖且去重(t *testing.T) {
 
 func TestClaudeArgs(t *testing.T) {
 	// 有顶层 model 且 env 未指定模型 → 追加 --model
-	got := ClaudeArgs("sonnet", nil, []string{"-p", "hi"})
+	got := ClaudeArgs("sonnet", nil, nil, []string{"-p", "hi"})
 	if strings.Join(got, " ") != "--model sonnet -p hi" {
 		t.Errorf("got %v", got)
 	}
 	// env 已含 ANTHROPIC_MODEL → 不追加
-	got = ClaudeArgs("sonnet", map[string]string{"ANTHROPIC_MODEL": "x"}, []string{"-p"})
+	got = ClaudeArgs("sonnet", map[string]string{"ANTHROPIC_MODEL": "x"}, nil, []string{"-p"})
 	if strings.Join(got, " ") != "-p" {
 		t.Errorf("env 指定模型时不应追加 --model, got %v", got)
 	}
 	// 无顶层 model → 不追加
-	got = ClaudeArgs("", nil, []string{"chat"})
+	got = ClaudeArgs("", nil, nil, []string{"chat"})
 	if strings.Join(got, " ") != "chat" {
 		t.Errorf("got %v", got)
+	}
+}
+
+func TestClaudeArgs_接入profile默认参数(t *testing.T) {
+	got := ClaudeArgs("sonnet", nil, []string{"--verbose"}, []string{"-p", "hi"})
+	if strings.Join(got, " ") != "--model sonnet --verbose -p hi" {
+		t.Errorf("默认参数应在 model 之后、extra 之前: %v", got)
 	}
 }
 

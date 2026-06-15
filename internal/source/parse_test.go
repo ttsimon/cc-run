@@ -55,3 +55,14 @@ func TestParseSettingsConfig_坏JSON报错(t *testing.T) {
 		t.Error("坏 JSON 应返回错误")
 	}
 }
+
+func TestParse_读取per_profile_args(t *testing.T) {
+	raw := `{"model":"sonnet","args":["--verbose"],"env":{"ANTHROPIC_BASE_URL":"http://x"}}`
+	p, err := ParseSettingsConfig("demo", profile.SourceCustom, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Args) != 1 || p.Args[0] != "--verbose" {
+		t.Errorf("args 未解析: %+v", p.Args)
+	}
+}

@@ -10,9 +10,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 
+	"github.com/ttsimon/cc-run/internal/chain"
 	"github.com/ttsimon/cc-run/internal/completion"
 	"github.com/ttsimon/cc-run/internal/config"
+	"github.com/ttsimon/cc-run/internal/doctor"
 	"github.com/ttsimon/cc-run/internal/launcher"
 	"github.com/ttsimon/cc-run/internal/overlay"
 	"github.com/ttsimon/cc-run/internal/profile"
@@ -51,6 +54,12 @@ func Execute(args []string) int {
 			return runShow(cfg, args[1:])
 		case "edit":
 			return runEdit(cfg, args[1:])
+		case "doctor":
+			return runDoctor(cfg, args[1:], os.Stdout)
+		case "__chain_guard":
+			return runChainGuard(os.Stdin, os.Stderr)
+		case "chain":
+			return runChain(cfg, args[1:], os.Stdout)
 		case "completion":
 			return runCompletion(args[1:], os.Stdout)
 		case "alias":
@@ -415,6 +424,192 @@ func runDefault(cfg config.Config, args []string, out io.Writer) int {
 	return 0
 }
 
+// runDoctor: 无参体检全部 profile；带名只检一个。
+func runDoctor(cfg config.Config, args []string, out io.Writer) int {
+	r, code := buildRegistry(cfg)
+	if code != 0 {
+		return code
+	}
+	var targets []profile.Profile
+	if len(args) > 0 {
+		p, err := r.Resolve(args[0])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		targets = []profile.Profile{p}
+	} else {
+		targets = r.List()
+	}
+	allOK := true
+	for _, p := range targets {
+		res := doctor.Check(p)
+		mark := "✓"
+		if !res.OK {
+			mark = "✗"
+			allOK = false
+		}
+		fmt.Fprintf(out, "%s %-20s %s\n", mark, res.Name, res.Detail)
+	}
+	if !allOK {
+		return 1
+	}
+	return 0
+}
+
+// runChain: ccr chain init [模板名] | ccr chain <file> [--auto]
+func runChain(cfg config.Config, args []string, out io.Writer) int {
+	if len(args) > 0 && args[0] == "init" {
+		name := "plan-impl-review"
+		if len(args) > 1 {
+			name = args[1]
+		}
+		raw, ok := chain.Template(name)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "没有内置模板 %q（现有：plan-impl-review）\n", name)
+			return 1
+		}
+		dest := name + ".chain.yaml"
+		if _, err := os.Stat(dest); err == nil {
+			fmt.Fprintf(os.Stderr, "%s 已存在，不覆盖\n", dest)
+			return 1
+		}
+		if err := os.WriteFile(dest, []byte(raw), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Fprintf(out, "已生成 %s，改好里面的 profile 名后用 `ccr chain %s --input \"你的需求\"` 跑\n", dest, dest)
+		return 0
+	}
+
+	auto := false
+	quiet := false
+	verbose := false
+	inputProvided := false
+	var input, file string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--auto":
+			auto = true
+		case "-q", "--quiet":
+			quiet = true
+		case "-v", "--verbose":
+			verbose = true
+		case "--input", "-i":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "--input 后面要跟需求文本")
+				return 1
+			}
+			i++
+			input, inputProvided = args[i], true
+		default:
+			file = args[i]
+		}
+	}
+	if quiet && verbose {
+		fmt.Fprintln(os.Stderr, "-q 与 -v 互斥，只能选一个")
+		return 1
+	}
+	if file == "" {
+		fmt.Fprintln(os.Stderr, `用法: ccr chain <chain.yaml> [--auto] [--input "需求"] [-q | -v]`)
+		return 1
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "读不到 chain 文件:", err)
+		return 1
+	}
+	c, err := chain.Parse(data)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	// 需求与占位符必须配对，跑任何段之前 fail-fast，绝不静默丢需求。
+	switch {
+	case inputProvided && !c.UsesInput():
+		fmt.Fprintln(os.Stderr, "传了 --input 但链里没任何 prompt 用 {{input}}，需求会被忽略。请在某段 prompt 里加 {{input}}。")
+		return 1
+	case !inputProvided && c.UsesInput():
+		fmt.Fprintln(os.Stderr, `这条链有 prompt 用了 {{input}}，但没传 --input。用 ccr chain <file> --input "需求"。`)
+		return 1
+	}
+	r, code := buildRegistry(cfg)
+	if code != 0 {
+		return code
+	}
+	o := chain.NewOrchestrator(r)
+	o.Out = out // 转发调用方的 writer，别让编排器输出固定写死 os.Stdout（可测）
+	o.Auto = auto
+	o.Input = input
+	switch {
+	case quiet:
+		o.Level = chain.LevelQuiet
+	case verbose:
+		o.Level = chain.LevelVerbose
+	default:
+		o.Level = chain.LevelNormal
+	}
+	if err := o.Run(c); err != nil {
+		fmt.Fprintln(os.Stderr, "chain 失败:", err)
+		return 1
+	}
+	fmt.Fprintln(out, "chain 完成:", c.Name)
+	return 0
+}
+
+// runChainGuard: PreToolUse 钩子调用，三道闸：
+//  1. 命令黑名单（CCR_CHAIN_DENY 换行分隔）
+//  2. Bash cd 上跳（cd .. / cd / / cd ~）
+//  3. 路径围栏（Read/Edit/Write/Glob/Grep/NotebookEdit/NotebookRead 等的 file_path/path/
+//     pattern/notebook_path 必须落在 CCR_CHAIN_WORKDIR 或 CCR_CHAIN_ALLOW_PATHS 内）
+//
+// 任一命中 → 退 2 阻止该工具调用。CCR_CHAIN_WORKDIR 为空时（非 chain 上下文，或老版本）
+// 不做围栏，向下兼容。
+func runChainGuard(in io.Reader, errOut io.Writer) int {
+	raw, _ := io.ReadAll(in)
+	info := chain.ParseHookInput(raw)
+
+	denylist := splitNonEmpty(os.Getenv("CCR_CHAIN_DENY"), "\n")
+	workdir := os.Getenv("CCR_CHAIN_WORKDIR")
+	allowPaths := splitNonEmpty(os.Getenv("CCR_CHAIN_ALLOW_PATHS"), "\n")
+
+	if info.Command != "" {
+		if chain.Denied(info.Command, denylist) {
+			fmt.Fprintf(errOut, "ccr: 命令命中红线黑名单，已拦截：%s\n", info.Command)
+			return 2
+		}
+		if workdir != "" && chain.BashEscapesWorkdir(info.Command) {
+			fmt.Fprintf(errOut, "ccr: 命令试图跳出工作目录，已拦截：%s（限于 %s）\n", info.Command, workdir)
+			return 2
+		}
+	}
+
+	if workdir != "" {
+		for _, p := range info.Paths {
+			if chain.PathEscapes(p, workdir, allowPaths) {
+				fmt.Fprintf(errOut, "ccr: 路径越界已拦截：%s（限于 %s）\n", p, workdir)
+				return 2
+			}
+		}
+	}
+	return 0
+}
+
+// splitNonEmpty 按 sep 拆并丢空段；strings.Split("", sep) 会返回 [""]，影响下游判断。
+func splitNonEmpty(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, sep)
+	out := parts[:0]
+	for _, p := range parts {
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // printUsage 打印帮助。
 func printUsage(out io.Writer) {
 	fmt.Fprint(out, `ccr — 用选定 provider 的环境变量启动 claude
@@ -430,6 +625,9 @@ func printUsage(out io.Writer) {
   ccr alias [<别名> <目标>]     列出 / 设置别名
   ccr unalias <别名>           删除别名
   ccr default [<名字>]          查看 / 设置默认配置
+  ccr doctor [名字]            体检后端可达性（不带名=全部）
+  ccr chain <file> [--auto] [--input "需求"] [-q|-v]
+                               跑一条多后端流水线（-q 静默/-v 详细）；ccr chain init 生成模板
   ccr completion <shell>       打印补全脚本（bash/zsh/powershell）
   ccr completion install [shell] [--uninstall]
                                一键装/卸补全到当前 shell 配置

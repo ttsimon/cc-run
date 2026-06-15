@@ -45,14 +45,18 @@
 - 链 yaml 里**可选**地定义一个修复段——它是「又一个普通段」，复用同一套放行引擎；不会自动重跑、不会循环。想再审一轮就重跑链，那也是手动。
 - `--auto` 模式：定义了的段一条道跑到黑，findings 与判定照写但**不据判定分叉**（据判定跳过/重跑 = YAGNI 掉的条件分支）。判定在 auto 模式纯留痕。
 
+## 执行可观测性
+
+- **可观测性**：段以 stream-json 跑，ccr 实时渲染工具调用与结果，详细度 `-q`/默认/`-v` 可调；放行点附 `diff --stat` 与耗时；非 TTY 自动降级。共享样式层 `internal/ui`。详见 `specs/2026-06-11-ccr-chain-observability-design.md`。
+
 ## 安全：四层纵深
 
-1. git worktree / 干净分支隔离，可整体回滚。
-2. 每段 `allow-tools` 白名单。
+1. 可插拔隔离（Isolator）：git 目录用临时 worktree（每段 ccr 兜底提交，避免 agent 不提交导致丢失）；非 git 目录用 copydir 快照。结束三态——跑完且审查 pass → 本地 merge 合回当前分支并删临时分支；needs-work / 报错 / 用户退出 → 保留成果并打印取回路径，**绝不静默销毁**。详见 `specs/2026-06-11-ccr-chain-isolation-design.md`。
+2. 每段 `allow-tools` 白名单。**注意：省略 `allow_tools` = 放行 claude 默认全部工具（非禁用全部），要收紧必须显式列出。**
 3. `PreToolUse` 钩子做命令红线黑名单（ccr 内置默认 + 用户在 yaml 追加），命中即 halt。
 4. 写操作圈在工作目录内。
 
-> ⚠️ Windows 真沙箱弱，主要靠 ①（worktree 回滚）+ ③（钩子黑名单）兜底。
+> ⚠️ Windows 真沙箱弱，主要靠 ①（隔离 + 成果交回）+ ③（钩子黑名单）兜底。
 
 ## yaml 谁写（v0.3 范围）
 

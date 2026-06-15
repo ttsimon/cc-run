@@ -19,6 +19,7 @@ type Profile struct {
 	Env       map[string]string // 注入 claude 的环境变量
 	BaseURL   string            // Env["ANTHROPIC_BASE_URL"]，仅展示用
 	IsCurrent bool              // 仅 cc-switch：是否为当前激活 provider
+	Args      []string          // per-profile 默认参数，拉起 claude 时追加在 model 之后、用户 extra 之前
 }
 
 // secretKeySubstrings 命中其一即视为敏感值，需打码。
