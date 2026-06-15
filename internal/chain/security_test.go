@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -129,6 +130,37 @@ func TestPathEscapes_空入参不阻断(t *testing.T) {
 	}
 	if PathEscapes("/x", "", nil) {
 		t.Error("空 workdir（非 chain 上下文）应放行，向下兼容")
+	}
+}
+
+// 回归：Windows 上 filepath.IsAbs("/etc/passwd")==false，曾导致 POSIX 风格根路径
+// 被 Join 进 workdir、误判为内部而绕过围栏。isRooted 必须在两平台都认 "/" 开头为根。
+func TestPathEscapes_POSIX根路径跨平台拦截(t *testing.T) {
+	wd := "/work"
+	// "/" 开头的越界路径：无论 Unix 还是 Windows 都必须拦（这是修复点）。
+	for _, p := range []string{"/etc/passwd", "/Users/foo/secret", "/x"} {
+		if !PathEscapes(p, wd, nil) {
+			t.Errorf("POSIX 根路径 %q 在 workdir 外，应拦", p)
+		}
+	}
+}
+
+func TestIsRooted(t *testing.T) {
+	// "/" 开头：两平台都是根。
+	for _, p := range []string{"/etc/passwd", "/", "/work/x"} {
+		if !isRooted(p) {
+			t.Errorf("%q 应视为根路径", p)
+		}
+	}
+	// 普通相对路径：两平台都不是根（会被 Join 进 workdir）。
+	for _, p := range []string{"sub/x.txt", "./x", "x", ".."} {
+		if isRooted(p) {
+			t.Errorf("%q 不应视为根路径", p)
+		}
+	}
+	// 反斜杠开头：仅 Windows 是根；Unix 上 \foo 是合法相对文件名，不能误判。
+	if got, want := isRooted(`\foo`), runtime.GOOS == "windows"; got != want {
+		t.Errorf(`isRooted("\foo")=%v, want %v（仅 Windows 视为根）`, got, want)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -66,7 +67,7 @@ func PathEscapes(rawPath, workdir string, allowed []string) bool {
 		return false
 	}
 	abs := rawPath
-	if !filepath.IsAbs(abs) {
+	if !isRooted(abs) {
 		abs = filepath.Join(workdir, abs)
 	}
 	abs = canonPath(abs)
@@ -83,6 +84,23 @@ func PathEscapes(rawPath, workdir string, allowed []string) bool {
 		}
 	}
 	return true
+}
+
+// isRooted 报告 path 是否为"根路径"（不该再拼到 workdir 后面）。
+// 不止 filepath.IsAbs：Windows 上 filepath.IsAbs("/etc/passwd") 为 false（缺盘符），
+// 但 POSIX 风格的 / 开头路径会被 OS 解析到当前盘根（workdir 之外），必须也当根路径拦，
+// 否则会被 Join 进 workdir 误判为内部、绕过围栏。
+//   - "/" 开头：两平台都视为根（Unix 上 IsAbs 已 true；Windows 上 IsAbs 漏掉，这里补）。
+//   - "\" 开头：仅 Windows 视为根（解析到当前盘根）；Unix 上反斜杠是普通字符，
+//     \foo 是合法相对文件名，不能误判为越界。
+func isRooted(path string) bool {
+	if filepath.IsAbs(path) {
+		return true
+	}
+	if strings.HasPrefix(path, "/") {
+		return true
+	}
+	return runtime.GOOS == "windows" && strings.HasPrefix(path, `\`)
 }
 
 // pathContains 判断 child 是否在 parent 内（或就是 parent）。
