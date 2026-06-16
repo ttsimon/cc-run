@@ -12,7 +12,8 @@ CC Run 的配置、元数据、运行时产物分布在以下路径。
 | `~/.ccr/config.json` | 路径覆盖（db 位置、profiles 目录） | 用户手动 |
 | `~/.cc-switch/*.db` | cc-switch 管理的 provider 数据库 | cc-switch（**只读**） |
 | `~/.cc-switch/cc-switch.db` | 默认 cc-switch 数据库路径 | cc-switch（**只读**） |
-| `.ccr-chain/` | chain 运行时产物（settings/verdict/findings） | `ccr chain` |
+| `.ccr-chain/verdict` | 审查段判定，单独一行 `pass` 或 `needs-work` | 审查段（`review: true`） |
+| `.ccr-chain/findings.md` | 审查段写出的问题清单 | 审查段（`review: true`） |
 
 ## 环境变量覆盖
 
@@ -86,7 +87,7 @@ CC Run 的配置、元数据、运行时产物分布在以下路径。
 
 ## chain 产物
 
-`.ccr-chain/` 目录由 `ccr chain` 管理，存放链执行过程中的状态、审查结论和输出成果。具体路径和交回机制见 [chain 隔离与成果交回](../chain/isolation.md)。
+`.ccr-chain/` 目录由 `ccr chain` 在工作目录里创建，存放审查段的判定（`verdict`）和问题清单（`findings.md`）。注意 PreToolUse 守卫的 `--settings` 不在这里——它写在工作目录**之外**的临时目录，agent 够不着，改不了自己头上的红线钩子。隔离与成果交回机制见 [chain 隔离与成果交回](../chain/isolation.md)。
 
 ## 更多信息
 

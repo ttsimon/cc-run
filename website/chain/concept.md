@@ -29,14 +29,19 @@ Plan（强模型） → Implement（便宜模型） → Review（另一家 provi
 两条命令：
 
 ```bash [初始化模板]
-ccr chain init            # 在当前目录生成 chain.yaml 模板
-ccr chain init mychain    # 生成 mychain.yaml
+ccr chain init            # 生成 plan-impl-review.chain.yaml（内置模板）
+ccr chain init mychain    # 用名为 mychain 的内置模板生成 mychain.chain.yaml
 ```
 
+::: tip 关于 init 的参数
+`init` 后面跟的是**内置模板名**（目前只有 `plan-impl-review`，也是缺省值），不是输出文件名。生成的文件固定叫 `<模板名>.chain.yaml`；若同名文件已存在，`init` 会拒绝覆盖。
+:::
+
 ```bash [运行链]
-ccr chain chain.yaml                     # 运行
-ccr chain chain.yaml --input "做一个 todolist app"   # 注入需求
-ccr chain chain.yaml --auto               # 跳过所有暂停，端到端跑完
+ccr chain plan-impl-review.chain.yaml                       # 运行
+ccr chain plan-impl-review.chain.yaml --input "做一个 todolist app"  # 注入需求
+ccr chain plan-impl-review.chain.yaml --auto                # 跳过所有暂停，端到端跑完
+ccr chain plan-impl-review.chain.yaml -q                    # 静默；-v 则更详细（二者互斥）
 ```
 
 模板文件会带着完整的注释和字段说明，把它当起点来改，比自己从零写快得多。
@@ -46,7 +51,7 @@ ccr chain chain.yaml --auto               # 跳过所有暂停，端到端跑完
 三段式引擎，每段职责单一：
 
 1. **分段执行**：每个 segment 是一个隔离的 `claude -p` 调用，执行完就退出——天然就是 handoff 边界。每段的 provider 由 yaml 中的 `profile` 字段指定。
-2. **交接（handoff）**：所有 segment 共享同一个工作目录，文件天然持久化。前一段的产出写入约定路径（如 `docs/plans/<task>.md`），后一段通过 <span v-pre>`{{prev.output}}`</span> 占位符得到方向性指引。
+2. **交接（handoff）**：所有 segment 共享同一个工作目录，文件天然持久化。前一段的产出写入约定路径（如 `docs/plans/<task>.md`），后一段通过 <span v-pre>`{{prev.output}}`</span> 占位符得到方向性指引。此外，引擎还会追踪「本链至今改动过的文件」，把这份清单作为软提示追加进下游每一段的 prompt，引导后续段聚焦在这些文件上、不去乱读外部路径。
 3. **人在回路中（human in the loop）**：默认每段结束后暂停，给你检查、编辑、跳过或退出的机会。详情见 [放行与审查](./pausing)。
 
 ## 下一步

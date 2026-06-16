@@ -34,8 +34,8 @@
 | 命令 | 作用 | 示例 |
 |------|------|------|
 | `ccr doctor [名]` <Badge type="info" text="v0.3" /> | 体检后端可达性 | `ccr doctor` |
-| `ccr chain <file> [--auto] [--input]` <Badge type="info" text="v0.3" /> | 跑一条链 | `ccr chain plan.yaml --auto` |
-| `ccr chain init [模板名]` <Badge type="info" text="v0.3" /> | 生成链模板 | `ccr chain init` |
+| `ccr chain <file> [--auto] [--input \| -i "需求"] [-q \| -v]` <Badge type="info" text="v0.3" /> | 跑一条链（`-q` 静默 / `-v` 详细，二者互斥） | `ccr chain plan.chain.yaml --auto` |
+| `ccr chain init [模板名]` <Badge type="info" text="v0.3" /> | 生成链模板到 `<模板名>.chain.yaml`（缺省模板 `plan-impl-review`） | `ccr chain init` |
 
 ## 补全类
 

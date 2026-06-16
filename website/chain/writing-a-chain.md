@@ -48,9 +48,13 @@ segments:
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `name` | string | 是 | 链的名字，用于显示和日志 |
-| `isolate` | boolean | 否 | 是否隔离到临时工作区（默认 `true`） |
+| `isolate` | boolean | 否 | 是否隔离到临时工作区（**默认 `false`**——省略即不隔离，直接在 `workdir` 操作）。要隔离必须显式写 `isolate: true` |
 | `workdir` | string | 否 | 指定工作目录，默认当前目录 |
 | `segments` | array | 是 | 段列表，按顺序执行 |
+
+::: warning isolate 默认不开
+`isolate` 缺省为 `false`，链会**直接在你的工作目录里跑**。需要可回滚的隔离区（见 [隔离与成果交回](./isolation)），必须显式写 `isolate: true`——内置模板已经替你写好了。
+:::
 
 ### Segment
 
@@ -59,10 +63,11 @@ segments:
 | `name` | string | 是 | 段名，用于显示和日志 |
 | `profile` | string | 是 | CC Run provider 名字，决定本段用哪个后端 |
 | `prompt` | string | 是 | 发给 claude 的 prompt，可含占位符 |
-| `allow_tools` | string[] | 否 | 本段允许的工具白名单 |
+| `allow_tools` | string[] | 否 | 本段允许的工具白名单（claude `--allowedTools`） |
 | `deny_commands` | string[] | 否 | 本段额外禁用的 shell 命令（叠加到内置默认） |
+| `allow_paths` | string[] | 否 | 路径围栏的白名单逃生口（如 `["/tmp"]`）。默认本段只能读写 `workdir` 内的路径；列在这里的路径额外放行 |
 | `review` | boolean | 否 | 是否为审查段（默认 `false`） |
-| `optional` | boolean | 否 | 是否为可选段（默认 `false`），可选段可在 `⏸` 时跳过 |
+| `optional` | boolean | 否 | 是否为可选段（默认 `false`）。仅影响 `⏸` 提示里的「可跳过」提示文案；任何段在放行点都能按 `s` 跳过 |
 
 ## 占位符
 
@@ -79,11 +84,12 @@ prompt 中可以使用两个占位符，运行时自动替换：
 
 ## 审查段
 
-设置 `review: true` 标记审查段。审查段有特殊行为：
+设置 `review: true` 标记审查段。引擎会在审查段 prompt 末尾自动追加固定指令，要求 Claude：
 
-- Claude 应写出 `findings`（发现的问题）和 `verdict`（`pass` 或 `needs-work`）
-- 审查段结束时一定暂停（即使在 `--auto` 模式下），让用户查看结果
-- `verdict` 是给人看的，引擎不根据它自动分支
+- 把发现的问题清单写到 `.ccr-chain/findings.md`
+- 在 `.ccr-chain/verdict` 写单独一行：`pass` 或 `needs-work`
+
+这个 `verdict` **不只是给人看的**——链跑完后，引擎会根据「最后一次审查的 verdict」自动决定隔离区成果是合并回去还是保留（fail-closed：只有明确 `pass` 才自动合并）。详见 [隔离与成果交回](./isolation)。引擎不会据 verdict 自动重跑或循环，但它确实驱动最终的「合并 / 保留」决策。
 
 详情见 [放行与审查](./pausing)。
 

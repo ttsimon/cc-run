@@ -57,7 +57,7 @@ go build -o ccr ./cmd/ccr
 
 ```bash
 $ ccr --version
-ccr version 0.1.2
+ccr v0.1.2 (commit abc1234, built 2026-06-01)
 ```
 
 如果显示版本号，安装就完成了。

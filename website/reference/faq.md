@@ -62,13 +62,12 @@ $ ccr .
 
 ## Q: chain 跑完成果去哪了？
 
-chain 执行有三种结束状态，每种状态的产物位置不同。
+开了隔离（`isolate: true`）时，链跑完后引擎按「最后一次审查的 verdict」**自动**决定成果去留，fail-closed：
 
-- 链跑完所有步骤 → 成果写入链配置指定的输出路径
-- 链被暂停等待审查 → 状态保存在 `.ccr-chain/`，审查通过后继续
-- 链被拒绝 → 产物在隔离区，不写回主目录
+- **verdict = pass**（或链中无审查段）→ 自动合并回当前分支
+- **verdict = needs-work / 判定缺失 / 出错 / 中途退出** → 成果保留、打印取回路径，绝不静默销毁
 
-详见 [chain 隔离与成果交回](../chain/isolation.md)。
+worktree 场景成果以提交留在临时分支上（`git merge <分支>` 取回）；copydir 场景临时目录整个保留给你。详见 [chain 隔离与成果交回](../chain/isolation.md)。
 
 ## Q: Windows 下补全怎么配？
 

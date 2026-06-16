@@ -13,12 +13,12 @@ $ ccr ls
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
 <pre>$ ccr ls
-kimi        (ccswitch)  默认 ·
-deepseek    (ccswitch)
-glm         (custom)    别名: g</pre>
+● kimi       [ccswitch] sonnet  https://api.moonshot.cn/anthropic
+  deepseek   [ccswitch] sonnet  https://api.deepseek.com/anthropic
+  glm        [custom  ]         https://open.bigmodel.cn/api/anthropic</pre>
 </div>
 
-`(ccswitch)` 表示来自 cc-switch 数据库（只读），`(custom)` 表示来自自定义目录。
+每行格式是 `名字 [来源] 模型 baseURL`。`[ccswitch]` 表示来自 cc-switch 数据库（只读），`[custom]` 表示来自自定义目录。行首的 `●` 标记 cc-switch 当前的全局 provider。
 
 ## 2. 选一个启动
 
@@ -35,12 +35,13 @@ $ ccr de             # 模糊命中：唯一则直启，多个则弹选择器
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
 <pre>$ ccr deepseek
-→ launching claude with provider: deepseek
-  Welcome to Claude Code!
+╭───────────────────────────╮
+│ ✻ Welcome to Claude Code! │
+╰───────────────────────────╯
   ...</pre>
 </div>
 
-CC Run 会给当前终端注入 deepseek 的 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，然后直接拉起 `claude`。你在 Claude Code 里什么也不用改。
+CC Run 会给当前终端注入 deepseek 的 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，然后直接 `exec` 拉起 `claude`——CC Run 本身不打印任何提示，claude 的界面直接接管终端。你在 Claude Code 里什么也不用改。
 
 ## 3. 多开
 
@@ -48,14 +49,12 @@ CC Run 会给当前终端注入 deepseek 的 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC
 
 ```bash
 $ ccr kimi
-→ launching claude with provider: kimi
 ```
 
 第三个 tab 跑第三个：
 
 ```bash
 $ ccr glm
-→ launching claude with provider: glm
 ```
 
 三个终端、三个后端，各自独立，互不干扰。这就是 CC Run 的核心用法。
