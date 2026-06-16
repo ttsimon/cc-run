@@ -24,7 +24,7 @@ CC Run 的配置来自两个来源，合并为一个列表。
 
 `model` 可选，`env` 中的键值对应注入到环境变量。
 
-两个来源合并后，每个配置标注来源标记。重名时用 `来源:名字` 消歧，如 `custom:DeepSeek` 或 `ccswitch:DeepSeek`。
+两个来源合并后，每个配置标注来源标记。重名时用 `来源:名字` 消歧，如 `custom:DeepSeek` 或 `cc-switch:DeepSeek`。
 
 ## 旁挂元数据
 
@@ -39,7 +39,7 @@ cc-switch 库只读，所以别名、默认、上次用等信息无法写回 cc-
 
 `ccr <参数>` 按以下顺序查找：
 
-1. **精确名 / 限定名** —— `deepseek` 或 `ccswitch:DeepSeek`
+1. **精确名 / 限定名** —— `deepseek` 或 `cc-switch:DeepSeek`
 2. **特殊记号** —— `-`（上次用的）、`.`（默认）
 3. **别名** —— 由 `ccr alias` 设定
 4. **模糊子串** —— 命中唯一 → 直接启动；命中多个 → 弹出选择器；未命中 → 报错

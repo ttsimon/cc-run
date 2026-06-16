@@ -13,12 +13,12 @@ $ ccr ls
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
 <pre>$ ccr ls
-● kimi       [ccswitch] sonnet  https://api.moonshot.cn/anthropic
-  deepseek   [ccswitch] sonnet  https://api.deepseek.com/anthropic
-  glm        [custom  ]         https://open.bigmodel.cn/api/anthropic</pre>
+● kimi       [cc-switch] sonnet  https://api.moonshot.cn/anthropic
+  deepseek   [cc-switch] sonnet  https://api.deepseek.com/anthropic
+  glm        [custom   ]         https://open.bigmodel.cn/api/anthropic</pre>
 </div>
 
-每行格式是 `名字 [来源] 模型 baseURL`。`[ccswitch]` 表示来自 cc-switch 数据库（只读），`[custom]` 表示来自自定义目录。行首的 `●` 标记 cc-switch 当前的全局 provider。
+每行格式是 `名字 [来源] 模型 baseURL`。`[cc-switch]` 表示来自 cc-switch 数据库（只读），`[custom]` 表示来自自定义目录。行首的 `●` 标记 cc-switch 当前的全局 provider。
 
 ## 2. 选一个启动
 

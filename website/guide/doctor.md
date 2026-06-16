@@ -14,18 +14,18 @@ $ ccr doctor deepseek # 只检查一个
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
 <pre>$ ccr doctor
-✓ deepseek (ccswitch)    → https://api.deepseek.com/anthropic      200 OK
-✓ kimi     (ccswitch)    → https://api.moonshot.cn/anthropic        200 OK
-✗ my-old   (custom)      → https://my-old.example.com/anthropic     连接超时
-──────────────────────────────────────────────────
-3 个配置，2 个正常，1 个异常</pre>
+✓ deepseek             HTTP 200
+✓ kimi                 HTTP 200
+✗ my-old               Get "https://my-old.example.com/anthropic": dial tcp: i/o timeout</pre>
 </div>
+
+每行格式是 `<标记> <名字> <详情>`，详情是 `HTTP <状态码>` 或失败原因。
 
 ## 输出怎么看
 
-- `✓` —— 后端连接正常，返回了预期响应
-- `✗` —— 连接失败，可能是 URL 不对、网络不通、或 token 失效
-- 每个配置会显示来源标记和实际请求的 URL
+- `✓` —— 对配置的 `ANTHROPIC_BASE_URL` 发了个 GET，**状态码 < 500** 就算后端在
+- 这意味着 `401` / `403`（端点活着、只是没带凭证或鉴权失败）**也算通过**——doctor 验的是「连得上」，不是「token 对不对」
+- `✗` —— 请求发不出去（URL 不对、网络不通、DNS 解析失败等），详情里是底层错误；配置缺 `ANTHROPIC_BASE_URL` 时详情是「无 ANTHROPIC_BASE_URL」
 
 ## 退出码
 

@@ -79,7 +79,7 @@ CC Run 的配置、元数据、运行时产物分布在以下路径。
 
 ```json
 {
-  "last": "ccswitch:deepseek"
+  "last": "cc-switch:deepseek"
 }
 ```
 

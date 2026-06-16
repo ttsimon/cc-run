@@ -19,7 +19,7 @@ Sources(来源)            Registry(合并)         Launcher(启动)
 
 - 两个配置来源：cc-switch 库（只读）+ 自定义目录 `~/.ccr/profiles/*.json`，合并为一个列表、标注来源、重名用 `来源:名字` 消歧。
 - **旁挂元数据层** `~/.ccr/overlay.json`（别名 + 默认）+ `~/.ccr/state.json`（上次用的）：cc-switch 库只读，别名/默认/上次写不回去，故另存一份；按名解析时叠加——特殊记号 `-`（上次）/ `.`（默认）、别名、模糊子串命中（唯一直启、多命中弹过滤选择器）。
-- **chain（v0.3）**：多后端 agent 流水线——无头 `claude -p` 分段、共享 git 工作目录 + `{{prev.output}}` 交棒、默认段间放行 / `--auto`、审查判定、命令黑名单 PreToolUse 钩子、可插拔隔离（worktree/copydir）+ 三态成果交回。详见 `docs/superpowers/specs/2026-06-09-ccr-chain-design.md`。
+- **chain（v0.3）**：多后端 agent 流水线——无头 `claude -p` 分段、共享工作目录 + `{{prev.output}}` 交棒 + `--input`/`{{input}}` 注入需求、改动文件集软提示注入下游、默认段间放行 / `--auto`（含 `-q`/`-v` 详简）、审查判定 fail-closed 自动合并/保留、PreToolUse 钩子三道闸（命令黑名单 + cd 上跳 + 路径围栏）、可插拔隔离（worktree/copydir，`isolate` 默认 false）+ 三态成果交回。详见 `docs/superpowers/specs/2026-06-09-ccr-chain-design.md`。
 - 纯逻辑（解析/合并/env 组装/参数）全部单元测试；拉起子进程用 Go helper-process 模式集成测试；TUI/editor 手动验证。
 
 ## 代码布局
@@ -48,6 +48,7 @@ docs/superpowers/   设计 spec 与实现计划
 
 - **提交信息**：Conventional Commits（`feat:`/`fix:`/`docs:`/`build:`/`ci:`/`chore:`/`refactor:`/`test:`/`security:`），commit-msg 钩子强制。只有 `feat:`/`fix:` 进发布说明。
 - **提交前**：`task check`（fmt + vet + lint + test）。
+- **PR 内容**：必须按 `.github/pull_request_template.md` 写——「说明」（做了什么 / 为什么）+「自查」清单（Conventional Commits 标题 / `task check` 通过 / 无真实密钥），如实勾选。完整贡献流程见 `CONTRIBUTING.md`。
 - **密钥安全**：绝不提交真实 token/key，哪怕在测试或文档里。假值一律带 `FAKE` 标记（如 `sk-FAKE...`），已在 `.gitleaks.toml` 放行；真实随机密钥会被 gitleaks 拦。
 - **不手写 CHANGELOG**：发布说明由 GoReleaser 从 commit 自动生成，Releases 页即变更日志。
 

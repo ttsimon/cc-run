@@ -34,9 +34,9 @@ features:
 <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
 </div>
 <pre>$ ccr ls
-● kimi       [ccswitch] sonnet  https://api.moonshot.cn/anthropic
-  deepseek   [ccswitch] sonnet  https://api.deepseek.com/anthropic
-  glm        [custom  ]         https://open.bigmodel.cn/api/anthropic
+● kimi       [cc-switch] sonnet  https://api.moonshot.cn/anthropic
+  deepseek   [cc-switch] sonnet  https://api.deepseek.com/anthropic
+  glm        [custom   ]         https://open.bigmodel.cn/api/anthropic
 $ ccr deepseek            # 给当前终端注入 deepseek 后端再直接拉起 claude
 ╭───────────────────────────╮
 │ ✻ Welcome to Claude Code! │
