@@ -48,6 +48,7 @@ docs/superpowers/   设计 spec 与实现计划
 
 - **提交信息**：Conventional Commits（`feat:`/`fix:`/`docs:`/`build:`/`ci:`/`chore:`/`refactor:`/`test:`/`security:`），commit-msg 钩子强制。只有 `feat:`/`fix:` 进发布说明。
 - **提交前**：`task check`（fmt + vet + lint + test）。
+- **PR 内容**：必须按 `.github/pull_request_template.md` 写——「说明」（做了什么 / 为什么）+「自查」清单（Conventional Commits 标题 / `task check` 通过 / 无真实密钥），如实勾选。完整贡献流程见 `CONTRIBUTING.md`。
 - **密钥安全**：绝不提交真实 token/key，哪怕在测试或文档里。假值一律带 `FAKE` 标记（如 `sk-FAKE...`），已在 `.gitleaks.toml` 放行；真实随机密钥会被 gitleaks 拦。
 - **不手写 CHANGELOG**：发布说明由 GoReleaser 从 commit 自动生成，Releases 页即变更日志。
 
