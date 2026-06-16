@@ -55,7 +55,7 @@ go build -o ccr ./cmd/ccr     # Windows 下产物为 ccr.exe
 | `ccr completion <shell>` | 打印补全脚本（bash/zsh/powershell） |
 | `ccr completion install [shell] [--uninstall]` | 一键装/卸补全到当前 shell 配置 |
 | `ccr doctor [名字]` | 体检后端可达性（HTTP 探测 ANTHROPIC_BASE_URL，<500 算通；不带名=全部，有不通则退出码非 0） |
-| `ccr chain <file> [--auto]` | 跑一条多后端流水线（yaml 描述）；`--auto` 不停顿一路跑完 |
+| `ccr chain <file> [--auto] [--input \| -i "需求"] [-q \| -v]` | 跑一条多后端流水线（yaml 描述）；`--auto` 不停顿一路跑完，`--input` 注入 `{{input}}`，`-q`/`-v` 调输出详简（互斥） |
 | `ccr chain init [模板名]` | 从内置模板生成 `<模板名>.chain.yaml`（默认模板 plan-impl-review） |
 
 名字在两个来源中冲突时，用限定名消歧：`ccr cc-switch:DeepSeek` 或 `ccr custom:DeepSeek`。
@@ -105,10 +105,10 @@ ccr chain plan-impl-review.chain.yaml --auto   # 一条道跑到黑，不停顿
 
 **chain.yaml 字段**：
 
-- 顶层：`name`、`isolate`（true=在临时 git worktree 跑，可整体回滚）、`segments`。
-- 每段：`profile`（ccr 配置查询名）、`prompt`（可含 `{{prev.output}}` 注入上段输出）、`allow_tools`（claude 工具白名单）、`deny_commands`（追加到内置命令黑名单，命中即拦）、`review`（true=该段写判定到 `.ccr-chain/verdict`）、`optional`（可选段，非 --auto 时在放行点决定是否跑）。
+- 顶层：`name`、`isolate`（**默认 false**；true=git 仓库走临时 worktree、非 git 走 copydir，可整体回滚）、`workdir`（默认当前目录）、`segments`。
+- 每段：`profile`（ccr 配置查询名）、`prompt`（可含 `{{prev.output}}` 注入上段输出路径、`{{input}}` 注入 `--input` 需求）、`allow_tools`（claude 工具白名单）、`deny_commands`（追加到内置命令黑名单，命中即拦）、`allow_paths`（路径围栏白名单逃生口，默认仅 workdir）、`review`（true=该段写判定到 `.ccr-chain/verdict`）、`optional`（可选段，放行点提示可跳过）。
 
-**安全**：worktree 隔离可回滚 + 每段工具白名单 + PreToolUse 钩子拦截命令黑名单 + 写操作圈在工作目录内。⚠️ Windows 真沙箱弱，主要靠 worktree 回滚 + 钩子黑名单兜底。
+**安全**：worktree/copydir 隔离可回滚 + 每段工具白名单 + PreToolUse 钩子（命令黑名单 + cd 上跳拦截 + 路径围栏）+ 每段干净 `CLAUDE_CONFIG_DIR`。⚠️ Windows 真沙箱弱，主要靠隔离回滚 + 钩子兜底。收尾按最后一次审查 verdict **fail-closed** 自动合并/保留（无审查段则直接合并）。
 
 **先体检**：`ccr doctor` 跑链前确认各后端可达。
 
